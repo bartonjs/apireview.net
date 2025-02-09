@@ -30,27 +30,27 @@ public sealed class OspoClient : IDisposable
 
     public async Task<OspoLinkSet> GetAllAsync()
     {
-        var links = await GetAsJsonAsync<IReadOnlyList<OspoLink>>($"people/links");
+        IReadOnlyList<OspoLink>? links = await GetAsJsonAsync<IReadOnlyList<OspoLink>>($"people/links");
         return links is null ? OspoLinkSet.Empty : new OspoLinkSet(links);
     }
 
     private async Task<T?> GetAsJsonAsync<T>(string requestUri)
     {
-        var request = new HttpRequestMessage(HttpMethod.Get, requestUri);
-        var response = await _httpClient.SendAsync(request);
+        HttpRequestMessage request = new HttpRequestMessage(HttpMethod.Get, requestUri);
+        HttpResponseMessage response = await _httpClient.SendAsync(request);
 
         if (response.StatusCode == HttpStatusCode.NotFound)
             return default;
 
         if (!response.IsSuccessStatusCode)
         {
-            var message = await response.Content.ReadAsStringAsync();
+            string message = await response.Content.ReadAsStringAsync();
             throw new Exception(message) { HResult = (int)response.StatusCode };
         }
 
-        var responseStream = await response.Content.ReadAsStreamAsync();
+        Stream responseStream = await response.Content.ReadAsStreamAsync();
 
-        var options = new JsonSerializerOptions
+        JsonSerializerOptions options = new JsonSerializerOptions
         {
             PropertyNamingPolicy = JsonNamingPolicy.CamelCase
         };

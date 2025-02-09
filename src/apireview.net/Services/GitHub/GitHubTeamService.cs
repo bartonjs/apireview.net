@@ -1,4 +1,4 @@
-using Octokit;
+﻿using Octokit;
 
 namespace ApiReviewDotNet.Services.GitHub;
 
@@ -22,7 +22,7 @@ public sealed class GitHubTeamService
     {
         try
         {
-            var github = await _clientFactory.CreateForAppAsync();
+            GitHubClient github = await _clientFactory.CreateForAppAsync();
             _membersBySlug = await LoadTeams(github);
             _logger.LogInformation("Loaded {count} teams", _membersBySlug.Count);
         }
@@ -34,17 +34,17 @@ public sealed class GitHubTeamService
 
     private async Task<Dictionary<string, IReadOnlyList<string>>> LoadTeams(GitHubClient github)
     {
-        var membersBySlug = new Dictionary<string, IReadOnlyList<string>>();
+        Dictionary<string, IReadOnlyList<string>> membersBySlug = new Dictionary<string, IReadOnlyList<string>>();
 
-        foreach (var org in _orgs)
+        foreach (string org in _orgs)
         {
-            var teams = await github.Organization.Team.GetAll(org);
+            IReadOnlyList<Team>? teams = await github.Organization.Team.GetAll(org);
 
-            foreach (var team in teams)
+            foreach (Team team in teams)
             {
-                var slug = $"{org}/{team.Slug}";
-                var members = await github.Organization.Team.GetAllMembers(team.Id);
-                var memberNames = members.Select(u => u.Login).ToArray();
+                string slug = $"{org}/{team.Slug}";
+                IReadOnlyList<User>? members = await github.Organization.Team.GetAllMembers(team.Id);
+                string[] memberNames = members.Select(u => u.Login).ToArray();
                 membersBySlug.Add(slug, memberNames);
             }
         }
@@ -54,7 +54,7 @@ public sealed class GitHubTeamService
 
     public IReadOnlyList<string>? GetMembers(string slug)
     {
-        _membersBySlug.TryGetValue(slug, out var result);
+        _membersBySlug.TryGetValue(slug, out IReadOnlyList<string>? result);
         return result;
     }
 }

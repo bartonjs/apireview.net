@@ -5,7 +5,7 @@
     <div class="input-group-prepend">
         <button class="btn btn-outline-secondary dropdown-toggle" type="button" data-toggle="dropdown" aria-haspopup="true" aria-expanded="false">@SelectedGroup.DisplayName</button>
         <div class="dropdown-menu">
-            @foreach (var rg in RepositoryGroupService.RepositoryGroups)
+            @foreach (RepositoryGroup rg in RepositoryGroupService.RepositoryGroups)
             {
                 <button class="dropdown-item" @onclick="_ => SelectedGroup = rg">@rg.DisplayName</button>
             }
@@ -19,7 +19,7 @@
 
         <div class="col-auto align-self-center">
             @{
-                var isChecked = _checkedIssues.Count == Issues.Count;
+                bool isChecked = _checkedIssues.Count == Issues.Count;
             }
             <input class="ml-2 mr-3" type="checkbox" value="@isChecked" @onchange="e => CheckAllIssues((bool)e.Value!)" />
         </div>
@@ -29,9 +29,9 @@
             {
                 <p class="text-muted m-0">
                     @{
-                        var numberOfOrgs = Issues.Select(i => i.Owner).Distinct().Count();
-                        var numberOfRepos = Issues.Select(i => i.Repo).Distinct().Count();
-                        var visibleIssues = VisibleIssues.Count(IsVisible);
+                        int numberOfOrgs = Issues.Select(i => i.Owner).Distinct().Count();
+                        int numberOfRepos = Issues.Select(i => i.Repo).Distinct().Count();
+                        int visibleIssues = VisibleIssues.Count(IsVisible);
                     }
 
                     @if (visibleIssues == Issues.Count)
@@ -74,7 +74,7 @@
                             <button class="dropdown-item" @onclick="_ => ToggleAllMilestones(false)">Select None</button>
                             <div class="dropdown-divider"></div>
 
-                            @foreach (var (k, v) in _milestones)
+                            @foreach ((string k, bool v) in _milestones)
                             {
                                 <div class="m-2 checkbox">
                                     <label><input class="mr-2 " type="checkbox" checked="@v" @onchange="_ => MilestoneChecked(k)">@k</label>
@@ -89,12 +89,12 @@
 </div>
 <div class="gh-issue-list">
 
-    @foreach (var issue in Issues)
+    @foreach (ApiReviewIssue issue in Issues)
     {
         if (!IsVisible(issue))
             continue;
 
-        var background = issue.IsBlocking ? "gh-issue-blocking" : "";
+        string background = issue.IsBlocking ? "gh-issue-blocking" : "";
 
         <div class="gh-issue-cell @background text-break">
             <div class="d-flex flex-row align-items-center">
@@ -104,7 +104,7 @@
                 <div>
                     <a class="gh-issue-title" href="@issue.Url">@issue.Title.HighlightCode()</a>
                     <span>
-                        @foreach (var label in issue.Labels)
+                        @foreach (ApiReviewLabel label in issue.Labels)
                         {
                             <span class="gh-label"
                                   style="@label.GetStyle()"
@@ -120,7 +120,7 @@
                         }
 
                         @{
-                            var rank = GetRank(issue);
+                            int rank = GetRank(issue);
                             if (rank >= 0)
                             {
                                 <span class="ml-2 mr-1 oi oi-elevator text-muted" aria-hidden="true" title="Backlog Rank"></span>@rank

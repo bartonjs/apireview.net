@@ -17,7 +17,7 @@ public sealed class AreaOwnerService
 
     public IReadOnlyList<string> GetOwners(string area)
     {
-        if (!_ownerByArea.TryGetValue(area, out var result))
+        if (!_ownerByArea.TryGetValue(area, out string[]? result))
             result = Array.Empty<string>();
 
         return result;
@@ -38,31 +38,31 @@ public sealed class AreaOwnerService
 
     private static async Task<Dictionary<string, string[]>> GetOwnersAsync(GitHubTeamService teamService)
     {
-        var url = "https://raw.githubusercontent.com/dotnet/runtime/main/docs/area-owners.md";
-        var client = new HttpClient();
-        var contents = await client.GetStringAsync(url);
-        var lines = GetLines(contents);
-        var result = new Dictionary<string, string[]>();
+        string url = "https://raw.githubusercontent.com/dotnet/runtime/main/docs/area-owners.md";
+        HttpClient client = new HttpClient();
+        string contents = await client.GetStringAsync(url);
+        IEnumerable<string> lines = GetLines(contents);
+        Dictionary<string, string[]> result = new Dictionary<string, string[]>();
 
-        foreach (var line in lines)
+        foreach (string line in lines)
         {
-            var parts = line.Split('|');
+            string[] parts = line.Split('|');
             if (parts.Length != 6)
                 continue;
 
-            var area = parts[1].Trim();
-            var ownerText = parts[3].Trim();
-            var owners = ownerText.Split(' ', StringSplitOptions.RemoveEmptyEntries);
+            string area = parts[1].Trim();
+            string ownerText = parts[3].Trim();
+            string[] owners = ownerText.Split(' ', StringSplitOptions.RemoveEmptyEntries);
             owners = owners.Select(o => o.Replace("@", "").Trim()).ToArray();
 
             if (!area.StartsWith("area-", StringComparison.OrdinalIgnoreCase))
                 continue;
 
-            var expandedOwners = new SortedSet<string>(StringComparer.OrdinalIgnoreCase);
+            SortedSet<string> expandedOwners = new SortedSet<string>(StringComparer.OrdinalIgnoreCase);
 
-            foreach (var owner in owners)
+            foreach (string owner in owners)
             {
-                var members = teamService.GetMembers(owner);
+                IReadOnlyList<string>? members = teamService.GetMembers(owner);
                 if (members is not null)
                     expandedOwners.UnionWith(members);
                 else
@@ -77,10 +77,10 @@ public sealed class AreaOwnerService
 
     private static IEnumerable<string> GetLines(string text)
     {
-        using var stringReader = new StringReader(text);
+        using StringReader stringReader = new StringReader(text);
         while (true)
         {
-            var line = stringReader.ReadLine();
+            string? line = stringReader.ReadLine();
             if (line is null)
                 yield break;
 

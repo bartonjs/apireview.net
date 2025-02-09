@@ -11,7 +11,7 @@ public static class GitHubIssueHelpers
         // [Feature Request] I'd love some API
         // API: Linq expressions
 
-        var labels = new[]
+        string[] labels = new[]
         {
                     "api",
                     "proposal",
@@ -25,10 +25,10 @@ public static class GitHubIssueHelpers
         {
             modified = false;
 
-            var match = Regex.Match(title, "^(\\[(?<prefix>[^\\]]+)\\]\\:?)|(?<prefix>(\\S+\\s+){1,3}\\S+\\:)");
+            Match match = Regex.Match(title, "^(\\[(?<prefix>[^\\]]+)\\]\\:?)|(?<prefix>(\\S+\\s+){1,3}\\S+\\:)");
             if (match.Success)
             {
-                var prefix = match.Groups["prefix"].Value;
+                string prefix = match.Groups["prefix"].Value;
                 if (labels.Any(l => prefix.Contains(l, StringComparison.OrdinalIgnoreCase)))
                 {
                     title = title.Substring(match.Index + match.Length).Trim();
@@ -44,16 +44,16 @@ public static class GitHubIssueHelpers
     {
         while (true)
         {
-            var firstColon = labelName.IndexOf(':');
+            int firstColon = labelName.IndexOf(':');
             if (firstColon < 0)
                 break;
 
-            var secondColon = labelName.IndexOf(':', firstColon + 1);
+            int secondColon = labelName.IndexOf(':', firstColon + 1);
             if (secondColon < 0)
                 break;
 
-            var emojiStart = firstColon;
-            var emojiLength = secondColon - emojiStart + 1;
+            int emojiStart = firstColon;
+            int emojiLength = secondColon - emojiStart + 1;
             labelName = labelName.Remove(emojiStart, emojiLength);
         }
 
@@ -62,13 +62,13 @@ public static class GitHubIssueHelpers
 
     public static string GetMarkdownLink(string owner, string repo, int id, string url, string title)
     {
-        var fixedTitle = FixTitle(title);
+        string fixedTitle = FixTitle(title);
         return $"[{owner}/{repo}#{id}: {fixedTitle}]({url})";
     }
 
     public static string GetHtmlLink(string owner, string repo, int id, string url, string title)
     {
-        var fixedTitle = FixTitle(title);
+        string fixedTitle = FixTitle(title);
         return $"<a href=\"{url}\">{owner}/{repo}#{id}: {fixedTitle}</a>";
     }
 }

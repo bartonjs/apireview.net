@@ -17,7 +17,7 @@ public sealed class TimeZoneService
     {
         if (_userOffset is null)
         {
-            var offsetInMinutes = await _jsRuntime.InvokeAsync<int>("getTimezoneOffset");
+            int offsetInMinutes = await _jsRuntime.InvokeAsync<int>("getTimezoneOffset");
             _userOffset = TimeSpan.FromMinutes(-offsetInMinutes);
         }
 

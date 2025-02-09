@@ -1,5 +1,6 @@
 ﻿using ApiReviewDotNet.Data;
 
+using Google.Apis.YouTube.v3;
 using Google.Apis.YouTube.v3.Data;
 
 using static Google.Apis.YouTube.v3.SearchResource.ListRequest;
@@ -17,11 +18,11 @@ public class YouTubeManager
 
     public async Task<ApiReviewVideo?> GetVideoAsync(string id)
     {
-        var service = _youTubeServiceFactory.Create();
+        YouTubeService service = _youTubeServiceFactory.Create();
 
-        var videoRequest = service.Videos.List("snippet,liveStreamingDetails");
+        VideosResource.ListRequest? videoRequest = service.Videos.List("snippet,liveStreamingDetails");
         videoRequest.Id = id;
-        var videoResponse = await videoRequest.ExecuteAsync();
+        VideoListResponse? videoResponse = await videoRequest.ExecuteAsync();
         if (videoResponse.Items.Count == 0)
             return null;
 
@@ -30,18 +31,18 @@ public class YouTubeManager
 
     public async Task<ApiReviewVideo?> GetVideoAsync(DateTimeOffset start, DateTimeOffset end)
     {
-        var videos = await GetVideosAsync(start, end);
+        IReadOnlyList<ApiReviewVideo> videos = await GetVideosAsync(start, end);
         return videos.FirstOrDefault();
     }
 
     public async Task<IReadOnlyList<ApiReviewVideo>> GetVideosAsync(DateTimeOffset start, DateTimeOffset end)
     {
-        var service = _youTubeServiceFactory.Create();
+        YouTubeService service = _youTubeServiceFactory.Create();
 
-        var result = new List<Video>();
-        var nextPageToken = "";
+        List<Video> result = new List<Video>();
+        string? nextPageToken = "";
 
-        var searchRequest = service.Search.List("snippet");
+        SearchResource.ListRequest? searchRequest = service.Search.List("snippet");
         searchRequest.ChannelId = ApiReviewConstants.NetFoundationChannelId;
         searchRequest.Type = "video";
         searchRequest.EventType = EventTypeEnum.Completed;
@@ -52,24 +53,26 @@ public class YouTubeManager
         while (nextPageToken is not null)
         {
             searchRequest.PageToken = nextPageToken;
-            var response = await searchRequest.ExecuteAsync();
+            SearchListResponse? response = await searchRequest.ExecuteAsync();
 
-            var ids = response.Items.Select(i => i.Id.VideoId);
-            var idString = string.Join(",", ids);
+            IEnumerable<string> ids = response.Items.Select(i => i.Id.VideoId);
+            string idString = string.Join(",", ids);
 
-            var videoRequest = service.Videos.List("snippet,liveStreamingDetails");
+            VideosResource.ListRequest? videoRequest = service.Videos.List("snippet,liveStreamingDetails");
             videoRequest.Id = idString;
-            var videoResponse = await videoRequest.ExecuteAsync();
+            VideoListResponse? videoResponse = await videoRequest.ExecuteAsync();
             result.AddRange(videoResponse.Items);
 
             nextPageToken = response.NextPageToken;
         }
 
-        var videos = result.Where(v => v.LiveStreamingDetails is not null &&
-                                       v.LiveStreamingDetails.ActualStartTimeDateTimeOffset is not null &&
-                                       v.LiveStreamingDetails.ActualEndTimeDateTimeOffset is not null)
-                           .Select(CreateVideo)
-                           .OrderBy(v => v.StartDateTime);
+        IOrderedEnumerable<ApiReviewVideo> videos = result.
+            Where(v => v.LiveStreamingDetails is not null &&
+                       v.LiveStreamingDetails.ActualStartTimeDateTimeOffset is not null &&
+                       v.LiveStreamingDetails.ActualEndTimeDateTimeOffset is not null).
+            Select(CreateVideo).
+            OrderBy(v => v.StartDateTime);
+
         return videos.ToArray();
     }
 

@@ -5,6 +5,7 @@ using ApiReviewDotNet.Services;
 
 using Microsoft.AspNetCore.Components;
 using Microsoft.AspNetCore.WebUtilities;
+using Microsoft.Extensions.Primitives;
 using Microsoft.JSInterop;
 
 namespace ApiReviewDotNet.Pages;
@@ -60,7 +61,7 @@ public sealed partial class Backlog : IDisposable
 
     public int GetRank(ApiReviewIssue issue)
     {
-        for (var i = 0; i < Issues.Count; i++)
+        for (int i = 0; i < Issues.Count; i++)
         {
             if (ReferenceEquals(Issues[i], issue))
                 return i + 1;
@@ -74,27 +75,27 @@ public sealed partial class Backlog : IDisposable
         _selectedGroup = RepositoryGroupService.Default;
         LoadData();
 
-        var uri = NavigationManager.ToAbsoluteUri(NavigationManager.Uri);
+        Uri uri = NavigationManager.ToAbsoluteUri(NavigationManager.Uri);
 
-        var queryParameters = QueryHelpers.ParseQuery(uri.Query);
+        Dictionary<string, StringValues> queryParameters = QueryHelpers.ParseQuery(uri.Query);
 
-        if (queryParameters.TryGetValue("g", out var g))
+        if (queryParameters.TryGetValue("g", out StringValues g))
         {
-            var name = g.ToString();
-            var group = RepositoryGroupService.RepositoryGroups.FirstOrDefault(g => string.Equals(g.Name, name, StringComparison.OrdinalIgnoreCase));
+            string name = g.ToString();
+            RepositoryGroup? group = RepositoryGroupService.RepositoryGroups.FirstOrDefault(g => string.Equals(g.Name, name, StringComparison.OrdinalIgnoreCase));
             if (group is not null)
                 _selectedGroup = group;
         }
 
-        if (queryParameters.TryGetValue("q", out var q))
+        if (queryParameters.TryGetValue("q", out StringValues q))
             _filter = q!;
 
-        if (queryParameters.TryGetValue("m", out var selectedMilestones))
+        if (queryParameters.TryGetValue("m", out StringValues selectedMilestones))
         {
-            foreach (var m in _milestones.Keys.ToArray())
+            foreach (string m in _milestones.Keys.ToArray())
                 _milestones[m] = false;
 
-            foreach (var m in selectedMilestones)
+            foreach (string? m in selectedMilestones)
             {
                 if (_milestones.ContainsKey(m!))
                     _milestones[m!] = true;
@@ -111,7 +112,7 @@ public sealed partial class Backlog : IDisposable
 
     private async void ChangeUrl()
     {
-        var query = "";
+        string query = "";
 
         if (SelectedGroup != RepositoryGroupService.Default)
             query += $"?g={Uri.EscapeDataString(SelectedGroup.Name)}";
@@ -119,14 +120,14 @@ public sealed partial class Backlog : IDisposable
         if (!string.IsNullOrEmpty(Filter))
             query += $"?q={Uri.EscapeDataString(Filter)}";
 
-        var selectedMilestones = _milestones.Where(m => m.Value).Select(kv => kv.Key);
+        IEnumerable<string> selectedMilestones = _milestones.Where(m => m.Value).Select(kv => kv.Key);
         if (selectedMilestones.Count() != _milestones.Count)
         {
-            foreach (var m in selectedMilestones)
+            foreach (string m in selectedMilestones)
                 query += $"&m={Uri.EscapeDataString(m)}";
         }
 
-        var uri = new UriBuilder(NavigationManager.Uri)
+        string uri = new UriBuilder(NavigationManager.Uri)
         {
             Query = query
         }.ToString();
@@ -157,7 +158,7 @@ public sealed partial class Backlog : IDisposable
         if (!SelectedGroup.Repos.Any(r => string.Equals(r.FullName, issue.RepoFull, StringComparison.OrdinalIgnoreCase)))
             return false;
 
-        if (_milestones is not null && _milestones.TryGetValue(issue.Milestone ?? ApiReviewConstants.NoMilestone, out var isChecked) && !isChecked)
+        if (_milestones is not null && _milestones.TryGetValue(issue.Milestone ?? ApiReviewConstants.NoMilestone, out bool isChecked) && !isChecked)
             return false;
 
         if (string.IsNullOrEmpty(Filter))
@@ -172,7 +173,7 @@ public sealed partial class Backlog : IDisposable
         if (issue.Author.Contains(Filter, StringComparison.OrdinalIgnoreCase))
             return true;
 
-        foreach (var label in issue.Labels)
+        foreach (ApiReviewLabel label in issue.Labels)
         {
             if (label.Name.Contains(Filter, StringComparison.OrdinalIgnoreCase))
                 return true;
@@ -184,14 +185,14 @@ public sealed partial class Backlog : IDisposable
     private SortedDictionary<string, bool> CreateMilestones(IReadOnlyList<ApiReviewIssue> issues,
                                                             SortedDictionary<string, bool> existingMilestones)
     {
-        var result = new SortedDictionary<string, bool>();
+        SortedDictionary<string, bool> result = new SortedDictionary<string, bool>();
 
-        foreach (var issue in issues)
+        foreach (ApiReviewIssue issue in issues)
             result[issue.Milestone ?? ApiReviewConstants.NoMilestone] = true;
 
         if (existingMilestones is not null)
         {
-            foreach (var (k, v) in existingMilestones)
+            foreach ((string k, bool v) in existingMilestones)
             {
                 if (result.ContainsKey(k))
                     result[k] = v;
@@ -203,7 +204,7 @@ public sealed partial class Backlog : IDisposable
 
     private void MilestoneChecked(string milestone)
     {
-        if (_milestones.TryGetValue(milestone, out var isChecked))
+        if (_milestones.TryGetValue(milestone, out bool isChecked))
         {
             _milestones[milestone] = !isChecked;
             ChangeUrl();
@@ -212,7 +213,7 @@ public sealed partial class Backlog : IDisposable
 
     private void ToggleAllMilestones(bool value)
     {
-        foreach (var m in _milestones.Keys.ToArray())
+        foreach (string m in _milestones.Keys.ToArray())
             _milestones[m] = value;
 
         ChangeUrl();
@@ -220,17 +221,17 @@ public sealed partial class Backlog : IDisposable
 
     private async Task CopySelectedItems()
     {
-        var text = GetMarkdown(useOfficeMentions: false);
-        var html = Markdig.Markdown.ToHtml(GetMarkdown(useOfficeMentions: true));
+        string text = GetMarkdown(useOfficeMentions: false);
+        string html = Markdig.Markdown.ToHtml(GetMarkdown(useOfficeMentions: true));
         await JSRuntime.InvokeVoidAsync("clipboardCopy.copyText", text, html);
         _checkedIssues.Clear();
     }
 
     private string GetMarkdown(bool useOfficeMentions)
     {
-        var sb = new StringBuilder();
+        StringBuilder sb = new StringBuilder();
 
-        foreach (var issue in SelectedIssues)
+        foreach (ApiReviewIssue issue in SelectedIssues)
         {
             sb.AppendLine($"* [{issue.IdFull}]({issue.Url}): {issue.Title}");
 
@@ -238,7 +239,7 @@ public sealed partial class Backlog : IDisposable
             {
                 sb.Append("    -");
 
-                foreach (var reviewer in issue.Reviewers)
+                foreach (ApiReviewer reviewer in issue.Reviewers)
                 {
                     if (!useOfficeMentions)
                     {
@@ -246,8 +247,8 @@ public sealed partial class Backlog : IDisposable
                     }
                     else
                     {
-                        var guid = Guid.NewGuid().ToString("N").ToUpper();
-                        var id = $"OWAAM{guid}Z";
+                        string guid = Guid.NewGuid().ToString("N").ToUpper();
+                        string id = $"OWAAM{guid}Z";
                         sb.AppendLine($" <a id=\"{id}\" href=\"{reviewer.Email}\">@{reviewer.Name}</a>");
                     }
                 }

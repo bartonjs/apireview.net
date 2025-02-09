@@ -21,19 +21,19 @@ public sealed class SummaryManager
 
     public async Task<ApiReviewSummary> GetSummaryAsync(RepositoryGroup repositoryGroup, DateTimeOffset start, DateTimeOffset end)
     {
-        var items = await _gitHubManager.GetFeedbackAsync(repositoryGroup.Repos, start, end);
+        IReadOnlyList<ApiReviewItem> items = await _gitHubManager.GetFeedbackAsync(repositoryGroup.Repos, start, end);
         return CreateSummary(repositoryGroup, null, items);
     }
 
     public async Task<ApiReviewSummary?> GetSummaryAsync(RepositoryGroup repositoryGroup, string videoId)
     {
-        var video = await _youTubeManager.GetVideoAsync(videoId);
+        ApiReviewVideo? video = await _youTubeManager.GetVideoAsync(videoId);
         if (video is null)
             return null;
 
-        var start = video.StartDateTime;
-        var end = video.EndDateTime + _extraTimeAfterStreamEnded;
-        var items = await _gitHubManager.GetFeedbackAsync(repositoryGroup.Repos, start, end);
+        DateTimeOffset start = video.StartDateTime;
+        DateTimeOffset end = video.EndDateTime + _extraTimeAfterStreamEnded;
+        IReadOnlyList<ApiReviewItem> items = await _gitHubManager.GetFeedbackAsync(repositoryGroup.Repos, start, end);
         return CreateSummary(repositoryGroup, video, items);
     }
 
@@ -49,26 +49,26 @@ public sealed class SummaryManager
         }
         else
         {
-            var reviewStart = video is null
+            DateTimeOffset reviewStart = video is null
                                 ? items.OrderBy(i => i.FeedbackDateTime).Select(i => i.FeedbackDateTime).First()
                                 : video.StartDateTime;
 
-            var reviewEnd = video is null
+            DateTimeOffset reviewEnd = video is null
                                 ? items.OrderBy(i => i.FeedbackDateTime).Select(i => i.FeedbackDateTime).Last()
                                 : video.EndDateTime + _extraTimeAfterStreamEnded;
 
-            for (var i = 0; i < items.Count; i++)
+            for (int i = 0; i < items.Count; i++)
             {
-                var current = items[i];
+                ApiReviewItem current = items[i];
 
                 if (video is not null)
                 {
-                    var wasDuringReview = reviewStart <= current.FeedbackDateTime && current.FeedbackDateTime <= reviewEnd;
+                    bool wasDuringReview = reviewStart <= current.FeedbackDateTime && current.FeedbackDateTime <= reviewEnd;
                     if (!wasDuringReview)
                         continue;
                 }
 
-                var previous = i == 0 ? null : items[i - 1];
+                ApiReviewItem? previous = i == 0 ? null : items[i - 1];
 
                 TimeSpan timeCode;
 
@@ -79,7 +79,7 @@ public sealed class SummaryManager
                 else
                 {
                     timeCode = (previous.FeedbackDateTime - video.StartDateTime).Add(TimeSpan.FromSeconds(10));
-                    var videoDuration = video.EndDateTime - video.StartDateTime;
+                    TimeSpan videoDuration = video.EndDateTime - video.StartDateTime;
                     if (timeCode >= videoDuration)
                         timeCode = items[i - 1].TimeCode;
                 }

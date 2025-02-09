@@ -14,7 +14,7 @@ using Microsoft.AspNetCore.Authentication.Cookies;
 using Octokit.Webhooks;
 using Octokit.Webhooks.AspNetCore;
 
-var builder = WebApplication.CreateBuilder(args);
+WebApplicationBuilder builder = WebApplication.CreateBuilder(args);
 
 builder.Services.AddRazorPages().AddJsonOptions(o =>
 {
@@ -61,16 +61,16 @@ builder.Services.AddAuthentication(options =>
     options.ClaimActions.MapJsonKey(ApiReviewConstants.GitHubAvatarUrl, ApiReviewConstants.GitHubAvatarUrl);
     options.Events.OnCreatingTicket = async context =>
     {
-        var groupService = context.HttpContext.RequestServices.GetRequiredService<RepositoryGroupService>();
-        var membershipService = context.HttpContext.RequestServices.GetRequiredService<GitHubMembershipService>();
+        RepositoryGroupService groupService = context.HttpContext.RequestServices.GetRequiredService<RepositoryGroupService>();
+        GitHubMembershipService membershipService = context.HttpContext.RequestServices.GetRequiredService<GitHubMembershipService>();
 
-        var accessToken = context.AccessToken;
-        var orgName = ApiReviewConstants.ApiApproverOrgName;
-        var teamSlugs = groupService.ApproverTeamSlugs;
+        string accessToken = context.AccessToken;
+        string orgName = ApiReviewConstants.ApiApproverOrgName;
+        IReadOnlyList<string> teamSlugs = groupService.ApproverTeamSlugs;
         if (accessToken is not null && context.Identity?.Name is not null)
         {
-            var userName = context.Identity.Name;
-            var isMember = await membershipService.IsMemberOfAnyTeamAsync(accessToken, orgName, teamSlugs, userName);
+            string userName = context.Identity.Name;
+            bool isMember = await membershipService.IsMemberOfAnyTeamAsync(accessToken, orgName, teamSlugs, userName);
             if (isMember)
                 context.Identity.AddClaim(new Claim(context.Identity.RoleClaimType, ApiReviewConstants.ApiApproverRole));
 
@@ -80,10 +80,10 @@ builder.Services.AddAuthentication(options =>
 });
 builder.Services.AddHttpClient();
 
-var app = builder.Build();
+WebApplication app = builder.Build();
 
 // Warm up services
-var refreshService = app.Services.GetRequiredService<RefreshService>();
+RefreshService refreshService = app.Services.GetRequiredService<RefreshService>();
 await refreshService.StartAsync();
 
 if (app.Environment.IsDevelopment())

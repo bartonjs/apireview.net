@@ -14,18 +14,18 @@ public static class MarkdownExtensions
         if (!text.Contains('`'))
             return new MarkupString(HtmlEncoder.Default.Encode(text));
 
-        using var writer = new StringWriter();
-        var p = 0;
+        using StringWriter writer = new StringWriter();
+        int p = 0;
 
         while (p < text.Length)
         {
-            if (!GetTicks(text, p, out var firstTick, out var secondTick))
+            if (!GetTicks(text, p, out int firstTick, out int secondTick))
             {
                 HtmlEncoder.Default.Encode(writer, text, p, text.Length - p);
                 break;
             }
 
-            var length = secondTick - firstTick - 1;
+            int length = secondTick - firstTick - 1;
             if (length > 0)
             {
                 HtmlEncoder.Default.Encode(writer, text, p, firstTick - p);
@@ -55,8 +55,8 @@ public static class MarkdownExtensions
 
     public static string ExpandEmojis(this string text)
     {
-        var sb = new StringBuilder(text);
-        foreach (var (key, value) in _emojiMapping)
+        StringBuilder sb = new StringBuilder(text);
+        foreach ((string key, string value) in _emojiMapping)
             sb.Replace(key, value);
 
         return sb.ToString();

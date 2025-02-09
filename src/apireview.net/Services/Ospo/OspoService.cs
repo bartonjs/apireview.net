@@ -22,7 +22,7 @@ public sealed class OspoService
 
         try
         {
-            var client = new OspoClient(_configuration["OspoToken"]!);
+            OspoClient client = new OspoClient(_configuration["OspoToken"]!);
             LinkSet = await client.GetAllAsync();
             _logger.LogInformation("Loaded {count} OSPO links", LinkSet.Links.Count);
         }

@@ -1,4 +1,5 @@
-﻿@inherits LayoutComponentBase
+﻿@using System.Security.Claims
+@inherits LayoutComponentBase
 
 <nav class="navbar navbar-expand-md navbar-dark bg-dotnet">
     <a class="navbar-brand" href="/">.NET API Review</a>
@@ -46,7 +47,7 @@
                 <div class="dropdown">
                     <button class="btn btn-dotnet dropdown-toggle" type="button" id="dropdownMenuButton" data-toggle="dropdown" aria-haspopup="true" aria-expanded="false">
                         @{
-                            var avatarUrl = context.User.FindFirst("avatar_url");
+                            Claim? avatarUrl = context.User.FindFirst("avatar_url");
                             if (avatarUrl is not null)
                             {
                                 <img src="@avatarUrl.Value"
@@ -66,7 +67,7 @@
             </Authorized>
             <NotAuthorized>
                 @{
-                    var returnUrl = NavigationManager.ToBaseRelativePath(NavigationManager.Uri);
+                    string returnUrl = NavigationManager.ToBaseRelativePath(NavigationManager.Uri);
                 }
                 <a class="btn btn-dotnet" href="signin?returnUrl=@returnUrl">Sign in</a>
             </NotAuthorized>

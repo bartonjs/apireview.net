@@ -4,16 +4,16 @@ public static class TimeFormatting
 {
     public static string Format(TimeSpan elapsedTime)
     {
-        var negated = elapsedTime.Ticks < 0;
+        bool negated = elapsedTime.Ticks < 0;
         if (negated)
             elapsedTime = elapsedTime.Negate();
 
-        var totalYears = Math.Round(elapsedTime.TotalDays / 365, 0, MidpointRounding.AwayFromZero);
-        var totalDays = Math.Round(elapsedTime.TotalDays, 0, MidpointRounding.AwayFromZero);
-        var totalHours = Math.Round(elapsedTime.TotalHours, 0, MidpointRounding.AwayFromZero);
-        var totalMinutes = Math.Round(elapsedTime.TotalMinutes, 0, MidpointRounding.AwayFromZero);
+        double totalYears = Math.Round(elapsedTime.TotalDays / 365, 0, MidpointRounding.AwayFromZero);
+        double totalDays = Math.Round(elapsedTime.TotalDays, 0, MidpointRounding.AwayFromZero);
+        double totalHours = Math.Round(elapsedTime.TotalHours, 0, MidpointRounding.AwayFromZero);
+        double totalMinutes = Math.Round(elapsedTime.TotalMinutes, 0, MidpointRounding.AwayFromZero);
 
-        var suffix = negated ? "from now" : "ago";
+        string suffix = negated ? "from now" : "ago";
 
         if (totalYears > 1)
             return $"{totalYears:N0} years {suffix}";
@@ -31,7 +31,7 @@ public static class TimeFormatting
 
     public static string FormatRelative(this DateTimeOffset dateTimeOffset)
     {
-        var elapased = DateTimeOffset.Now.Subtract(dateTimeOffset);
+        TimeSpan elapased = DateTimeOffset.Now.Subtract(dateTimeOffset);
         return Format(elapased);
     }
 }

@@ -16,13 +16,13 @@ public sealed class GitHubMembershipService
     {
         try
         {
-            var productInformation = new ProductHeaderValue(ApiReviewConstants.ProductName);
-            var client = new GitHubClient(productInformation)
+            ProductHeaderValue productInformation = new ProductHeaderValue(ApiReviewConstants.ProductName);
+            GitHubClient client = new GitHubClient(productInformation)
             {
                 Credentials = new Credentials(accessToken)
             };
 
-            foreach (var teamSlug in teamSlugs)
+            foreach (string teamSlug in teamSlugs)
             {
                 Team team;
                 try
@@ -37,7 +37,7 @@ public sealed class GitHubMembershipService
 
                 try
                 {
-                    var membership = await client.Organization.Team.GetMembershipDetails(team.Id, userName);
+                    TeamMembershipDetails? membership = await client.Organization.Team.GetMembershipDetails(team.Id, userName);
                     if (membership is not null && membership.State == MembershipState.Active)
                         return true;
                 }

@@ -9,13 +9,13 @@ public static class RedirectionExtensions
     {
         return app.Use(async (context, next) =>
         {
-            var url = new Uri(context.Request.GetEncodedUrl());
+            Uri url = new Uri(context.Request.GetEncodedUrl());
             if (url.Host.Equals(oldHost, StringComparison.OrdinalIgnoreCase))
             {
-                var response = context.Response;
+                HttpResponse response = context.Response;
                 response.StatusCode = StatusCodes.Status301MovedPermanently;
 
-                var newUrl = new UriBuilder(url)
+                string newUrl = new UriBuilder(url)
                 {
                     Host = newHost
                 }.ToString();

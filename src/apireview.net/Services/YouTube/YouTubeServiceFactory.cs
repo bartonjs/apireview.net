@@ -14,7 +14,7 @@ public sealed class YouTubeServiceFactory
 
     public YouTubeService Create()
     {
-        var initializer = new BaseClientService.Initializer
+        BaseClientService.Initializer initializer = new BaseClientService.Initializer
         {
             ApiKey = _configuration["YouTubeKey"]
         };

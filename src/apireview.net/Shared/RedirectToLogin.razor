@@ -7,11 +7,11 @@
 
     protected override async Task OnInitializedAsync()
     {
-        var authenticationState = await AuthenticationStateTask;
+        AuthenticationState? authenticationState = await AuthenticationStateTask;
 
         if (authenticationState?.User?.Identity is null || !authenticationState.User.Identity.IsAuthenticated)
         {
-            var returnUrl = Navigation.ToBaseRelativePath(Navigation.Uri);
+            string returnUrl = Navigation.ToBaseRelativePath(Navigation.Uri);
 
             if (string.IsNullOrWhiteSpace(returnUrl))
                 Navigation.NavigateTo("/signin", true);

@@ -19,32 +19,32 @@ public sealed class GitHubClientFactory
     {
         // See: https://octokitnet.readthedocs.io/en/latest/github-apps/ for details.
 
-        var appId = Convert.ToInt32(_configuration["GitHubAppId"]);
-        var privateKey = _configuration["GitHubAppPrivateKey"]!;
+        int appId = Convert.ToInt32(_configuration["GitHubAppId"]);
+        string privateKey = _configuration["GitHubAppPrivateKey"]!;
 
-        var privateKeySource = new PlainStringPrivateKeySource(privateKey);
-        var generator = new GitHubJwtFactory(
+        PlainStringPrivateKeySource privateKeySource = new PlainStringPrivateKeySource(privateKey);
+        GitHubJwtFactory generator = new GitHubJwtFactory(
             privateKeySource,
             new GitHubJwtFactoryOptions
             {
                 AppIntegrationId = appId,
                 ExpirationSeconds = 8 * 60 // 600 is apparently too high
             });
-        var token = generator.CreateEncodedJwtToken();
+        string? token = generator.CreateEncodedJwtToken();
 
-        var client = CreateForToken(token, AuthenticationType.Bearer);
+        GitHubClient client = CreateForToken(token, AuthenticationType.Bearer);
 
-        var installations = await client.GitHubApps.GetAllInstallationsForCurrent();
-        var installation = installations.Single();
-        var installationTokenResult = await client.GitHubApps.CreateInstallationToken(installation.Id);
+        IReadOnlyList<Installation>? installations = await client.GitHubApps.GetAllInstallationsForCurrent();
+        Installation installation = installations.Single();
+        AccessToken? installationTokenResult = await client.GitHubApps.CreateInstallationToken(installation.Id);
 
         return CreateForToken(installationTokenResult.Token, AuthenticationType.Oauth);
     }
 
     private static GitHubClient CreateForToken(string token, AuthenticationType authenticationType)
     {
-        var productInformation = new ProductHeaderValue(ApiReviewConstants.ProductName);
-        var client = new GitHubClient(productInformation)
+        ProductHeaderValue productInformation = new ProductHeaderValue(ApiReviewConstants.ProductName);
+        GitHubClient client = new GitHubClient(productInformation)
         {
             Credentials = new Credentials(token, authenticationType)
         };

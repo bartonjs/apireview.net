@@ -70,7 +70,7 @@ public partial class Publish
             }
             else
             {
-                var match = Regex.Match(_videoUrl, @"https://www\.youtube\.com/watch\?v=(?<videoId>[^&]+)");
+                Match match = Regex.Match(_videoUrl, @"https://www\.youtube\.com/watch\?v=(?<videoId>[^&]+)");
                 if (!match.Success)
                 {
                     VideoUrlValidationMessage = "The YouTube video URL isn't recognized";
@@ -158,7 +158,7 @@ public partial class Publish
 
         _cts = new CancellationTokenSource();
 
-        var token = _cts.Token;
+        CancellationToken token = _cts.Token;
 
         IReadOnlyList<ApiReviewVideo> videos = Array.Empty<ApiReviewVideo>();
 
@@ -170,7 +170,7 @@ public partial class Publish
             }
             else
             {
-                var video = await NotesService.GetVideo(_videoId);
+                ApiReviewVideo? video = await NotesService.GetVideo(_videoId);
                 if (video is null)
                     videos = Array.Empty<ApiReviewVideo>();
                 else
@@ -215,9 +215,9 @@ public partial class Publish
 
         _cts = new CancellationTokenSource();
 
-        var token = _cts.Token;
+        CancellationToken token = _cts.Token;
 
-        var summary = await NotesService.IssuesForVideo(SelectedRepositoryGroup, video.Id);
+        ApiReviewSummary? summary = await NotesService.IssuesForVideo(SelectedRepositoryGroup, video.Id);
         if (token.IsCancellationRequested)
             return;
 

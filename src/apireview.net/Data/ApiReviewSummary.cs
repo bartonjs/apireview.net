@@ -22,7 +22,7 @@ public sealed class ApiReviewSummary
         if (Video == null)
             return null;
 
-        var timeCodeText = $"{timeCode.Hours}h{timeCode.Minutes}m{timeCode.Seconds}s";
+        string timeCodeText = $"{timeCode.Hours}h{timeCode.Minutes}m{timeCode.Seconds}s";
         return $"https://www.youtube.com/watch?v={Video.Id}&t={timeCodeText}";
     }
 }

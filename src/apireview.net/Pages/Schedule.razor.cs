@@ -29,7 +29,7 @@ public sealed partial class Schedule
     {
         if (Today is null)
         {
-            var userDateTime = await TimeZoneService.ToLocalAsync(DateTime.UtcNow);
+            DateTimeOffset userDateTime = await TimeZoneService.ToLocalAsync(DateTime.UtcNow);
             Today = new DateTimeOffset(userDateTime.Year, userDateTime.Month, userDateTime.Day, 0, 0, 0, 0, userDateTime.Offset);
         }
 

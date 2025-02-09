@@ -4,7 +4,7 @@
     <div class="col col-lg-auto">
         <label for="selectRepositoryGroup">Repo Group</label>
         <select class="form-control" id="selectRepositoryGroup" @bind="SelectedRepositoryGroupName">
-            @foreach (var rg in RepositoryGroupService.RepositoryGroups)
+            @foreach (RepositoryGroup rg in RepositoryGroupService.RepositoryGroups)
             {
                 <option value="@rg.Name">@rg.DisplayName</option>
             }
@@ -72,7 +72,7 @@
 @if (Videos.Any())
 {
     <div class="mb-3 d-flex flex-row flex-wrap">
-        @foreach (var video in Videos)
+        @foreach (ApiReviewVideo video in Videos)
         {
             <div class="p-2 @(SelectedVideo == video ? "yt-video-selected" : null)" @onclick="@(e => SelectVideoAsync(video))">
                 <div class="yt-video">
@@ -94,13 +94,13 @@
 else if (Summary is not null && Summary.Items.Any())
 {
     <div class="gh-issue-list">
-        @foreach (var item in Summary.Items)
+        @foreach (ApiReviewItem item in Summary.Items)
         {
-            var videoUrl = Summary.GetVideoUrl(item.TimeCode);
+            string? videoUrl = Summary.GetVideoUrl(item.TimeCode);
             <div class="gh-issue-cell">
                 <a class="gh-issue-title" href="@item.Issue.Url">@item.Issue.Title</a>
                 <span>
-                    @foreach (var label in item.Issue.Labels)
+                    @foreach (ApiReviewLabel label in item.Issue.Labels)
                     {
                         <span class="gh-label"
                               style="@label.GetStyle()"

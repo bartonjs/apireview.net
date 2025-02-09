@@ -35,11 +35,11 @@ public sealed class RepositoryGroup
 
     public static IReadOnlyList<RepositoryGroup> Get(IConfiguration configuration)
     {
-        var result = new List<RepositoryGroup>();
+        List<RepositoryGroup> result = new List<RepositoryGroup>();
 
-        foreach (var groupConfiguration in configuration.GetChildren())
+        foreach (IConfigurationSection groupConfiguration in configuration.GetChildren())
         {
-            var item = new RepositoryGroup(
+            RepositoryGroup item = new RepositoryGroup(
                 name: groupConfiguration.Key,
                 displayName: groupConfiguration["DisplayName"]!,
                 isDefault: groupConfiguration.GetValue("IsDefault", false),

@@ -2,6 +2,9 @@
 using ApiReviewDotNet.Services.GitHub;
 using ApiReviewDotNet.Services.YouTube;
 
+using Google.Apis.YouTube.v3;
+using Google.Apis.YouTube.v3.Data;
+
 using Markdig;
 
 using Octokit;
@@ -42,7 +45,7 @@ public sealed class SummaryPublishingService
         if (!summary.Items.Any())
             return ApiReviewPublicationResult.Failed();
 
-        var group = _repositoryGroupService.Get(summary.RepositoryGroup);
+        RepositoryGroup? group = _repositoryGroupService.Get(summary.RepositoryGroup);
         if (group is null)
             return ApiReviewPublicationResult.Failed();
 
@@ -59,7 +62,7 @@ public sealed class SummaryPublishingService
             await UpdateCommentsAsync(summary);
         }
 
-        var url = await CommitAsync(group, summary);
+        string url = await CommitAsync(group, summary);
         await SendEmailAsync(group, summary);
         return ApiReviewPublicationResult.Suceess(url);
     }
@@ -69,12 +72,12 @@ public sealed class SummaryPublishingService
         if (group.MailingList is null)
             return;
 
-        var key = _configuration["SendGridKey"];
-        var date = summary.Items.First().FeedbackDateTime.Date;
-        var subject = $"API Review Notes {date:d}";
-        var markdown = GetMarkdown(summary);
-        var body = Markdown.ToHtml(markdown);
-        var msg = new SendGridMessage();
+        string? key = _configuration["SendGridKey"];
+        DateTime date = summary.Items.First().FeedbackDateTime.Date;
+        string subject = $"API Review Notes {date:d}";
+        string markdown = GetMarkdown(summary);
+        string body = Markdown.ToHtml(markdown);
+        SendGridMessage msg = new SendGridMessage();
         msg.SetFrom(new EmailAddress("notes@apireview.net", ".NET API Reviews"));
         msg.AddTo(new EmailAddress(group.MailingList));
         msg.SetReplyTo(new EmailAddress(group.MailingReplyTo));
@@ -83,7 +86,7 @@ public sealed class SummaryPublishingService
 
         try
         {
-            var client = new SendGridClient(key);
+            SendGridClient client = new SendGridClient(key);
             await client.SendEmailAsync(msg);
         }
         catch (Exception ex)
@@ -97,42 +100,42 @@ public sealed class SummaryPublishingService
         if (summary.Video is null)
             return;
 
-        using var descriptionBuilder = new StringWriter();
-        foreach (var item in summary.Items)
+        using StringWriter descriptionBuilder = new StringWriter();
+        foreach (ApiReviewItem item in summary.Items)
         {
-            var tc = item.TimeCode;
+            TimeSpan tc = item.TimeCode;
             descriptionBuilder.WriteLine($"{tc.Hours:00}:{tc.Minutes:00}:{tc.Seconds:00} - {item.Decision}: {item.Issue.Title} {item.FeedbackUrl}");
         }
 
-        var description = descriptionBuilder.ToString()
+        string description = descriptionBuilder.ToString()
                                             .Replace("<", "(")
                                             .Replace(">", ")");
 
-        var service = _youTubeServiceFactory.Create();
+        YouTubeService service = _youTubeServiceFactory.Create();
 
-        var listRequest = service.Videos.List("snippet");
+        VideosResource.ListRequest? listRequest = service.Videos.List("snippet");
         listRequest.Id = summary.Video.Id;
-        var listResponse = await listRequest.ExecuteAsync();
+        VideoListResponse? listResponse = await listRequest.ExecuteAsync();
 
-        var video = listResponse.Items[0];
+        Video? video = listResponse.Items[0];
         video.Snippet.Description = description;
 
-        var updateRequest = service.Videos.Update(video, "snippet");
+        VideosResource.UpdateRequest? updateRequest = service.Videos.Update(video, "snippet");
         await updateRequest.ExecuteAsync();
     }
 
     private async Task UpdateCommentsAsync(ApiReviewSummary summary)
     {
-        var github = await _clientFactory.CreateForAppAsync();
+        GitHubClient github = await _clientFactory.CreateForAppAsync();
 
-        foreach (var item in summary.Items)
+        foreach (ApiReviewItem item in summary.Items)
         {
-            var videoUrl = summary.GetVideoUrl(item.TimeCode);
+            string? videoUrl = summary.GetVideoUrl(item.TimeCode);
 
             if (item.FeedbackId is not null && videoUrl is not null)
             {
-                var updatedMarkdown = $"[Video]({videoUrl})\n\n{item.FeedbackMarkdown}";
-                var commentId = Convert.ToInt64(item.FeedbackId);
+                string updatedMarkdown = $"[Video]({videoUrl})\n\n{item.FeedbackMarkdown}";
+                long commentId = Convert.ToInt64(item.FeedbackId);
                 await github.Issue.Comment.Update(item.Issue.Owner, item.Issue.Repo, commentId, updatedMarkdown);
             }
         }
@@ -140,21 +143,21 @@ public sealed class SummaryPublishingService
 
     private async Task UpdateCommentsDevAsync(ApiReviewSummary summary)
     {
-        var (owner, repo) = _repositoryGroupService.Repositories.First();
+        (string owner, string repo) = _repositoryGroupService.Repositories.First();
 
         if (!summary.Items.All(i => i.Issue.Owner == owner &&
                                     i.Issue.Repo == repo))
             return;
 
-        var github = await _clientFactory.CreateForAppAsync();
+        GitHubClient github = await _clientFactory.CreateForAppAsync();
 
-        foreach (var item in summary.Items)
+        foreach (ApiReviewItem item in summary.Items)
         {
             if (item.FeedbackId is not null)
             {
-                var status = item.Decision.ToString();
-                var updatedMarkdown = $"[Video]({status})\n\n{item.FeedbackMarkdown}";
-                var commentId = Convert.ToInt64(item.FeedbackId);
+                string status = item.Decision.ToString();
+                string updatedMarkdown = $"[Video]({status})\n\n{item.FeedbackMarkdown}";
+                long commentId = Convert.ToInt64(item.FeedbackId);
                 await github.Issue.Comment.Update(item.Issue.Owner, item.Issue.Repo, commentId, updatedMarkdown);
             }
         }
@@ -162,59 +165,59 @@ public sealed class SummaryPublishingService
 
     private async Task<string> CommitAsync(RepositoryGroup group, ApiReviewSummary summary)
     {
-        var (owner, repo) = group.NotesRepo;
-        var branch = ApiReviewConstants.ApiReviewsBranch;
-        var head = $"heads/{branch}";
-        var date = summary.Items.First().FeedbackDateTime.DateTime;
-        var markdown = $"# API Review {date:d}\n\n{GetMarkdown(summary)}";
-        var path = $"{date.Year}/{date.Month:00}-{date.Day:00}-{group.NotesSuffix}/README.md";
-        var commitMessage = $"Add review notes for {date:d}";
+        (string owner, string repo) = group.NotesRepo;
+        string branch = ApiReviewConstants.ApiReviewsBranch;
+        string head = $"heads/{branch}";
+        DateTime date = summary.Items.First().FeedbackDateTime.DateTime;
+        string markdown = $"# API Review {date:d}\n\n{GetMarkdown(summary)}";
+        string path = $"{date.Year}/{date.Month:00}-{date.Day:00}-{group.NotesSuffix}/README.md";
+        string commitMessage = $"Add review notes for {date:d}";
 
-        var github = await _clientFactory.CreateForAppAsync();
-        var masterReference = await github.Git.Reference.Get(owner, repo, head);
-        var latestCommit = await github.Git.Commit.Get(owner, repo, masterReference.Object.Sha);
+        GitHubClient github = await _clientFactory.CreateForAppAsync();
+        Reference? masterReference = await github.Git.Reference.Get(owner, repo, head);
+        Commit? latestCommit = await github.Git.Commit.Get(owner, repo, masterReference.Object.Sha);
 
-        var recursiveTreeResponse = await github.Git.Tree.GetRecursive(owner, repo, latestCommit.Tree.Sha);
-        var file = recursiveTreeResponse.Tree.SingleOrDefault(t => t.Path == path);
+        TreeResponse? recursiveTreeResponse = await github.Git.Tree.GetRecursive(owner, repo, latestCommit.Tree.Sha);
+        TreeItem? file = recursiveTreeResponse.Tree.SingleOrDefault(t => t.Path == path);
 
         if (file is null)
         {
-            var newTreeItem = new NewTreeItem
+            NewTreeItem newTreeItem = new NewTreeItem
             {
                 Mode = "100644",
                 Path = path,
                 Content = markdown
             };
 
-            var newTree = new NewTree
+            NewTree newTree = new NewTree
             {
                 BaseTree = latestCommit.Tree.Sha
             };
             newTree.Tree.Add(newTreeItem);
 
-            var newTreeResponse = await github.Git.Tree.Create(owner, repo, newTree);
-            var newCommit = new NewCommit(commitMessage, newTreeResponse.Sha, latestCommit.Sha);
-            var newCommitResponse = await github.Git.Commit.Create(owner, repo, newCommit);
+            TreeResponse? newTreeResponse = await github.Git.Tree.Create(owner, repo, newTree);
+            NewCommit newCommit = new NewCommit(commitMessage, newTreeResponse.Sha, latestCommit.Sha);
+            Commit? newCommitResponse = await github.Git.Commit.Create(owner, repo, newCommit);
 
-            var newReference = new ReferenceUpdate(newCommitResponse.Sha);
+            ReferenceUpdate newReference = new ReferenceUpdate(newCommitResponse.Sha);
             await github.Git.Reference.Update(owner, repo, head, newReference);
         }
 
-        var url = $"https://github.com/{owner}/{repo}/blob/{branch}/{path}";
+        string url = $"https://github.com/{owner}/{repo}/blob/{branch}/{path}";
         return url;
     }
 
     private static string GetMarkdown(ApiReviewSummary summary)
     {
-        var noteWriter = new StringWriter();
+        StringWriter noteWriter = new StringWriter();
 
-        foreach (var item in summary.Items)
+        foreach (ApiReviewItem item in summary.Items)
         {
             noteWriter.WriteLine($"## {item.Issue.Title}");
             noteWriter.WriteLine();
             noteWriter.Write($"**{item.Decision}** | [#{item.Issue.Repo}/{item.Issue.Id}]({item.FeedbackUrl})");
 
-            var videoUrl = summary.GetVideoUrl(item.TimeCode);
+            string? videoUrl = summary.GetVideoUrl(item.TimeCode);
             if (videoUrl is not null)
                 noteWriter.Write($" | [Video]({videoUrl})");
 

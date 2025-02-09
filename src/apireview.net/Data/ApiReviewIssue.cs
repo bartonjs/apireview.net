@@ -100,7 +100,7 @@ public sealed class ApiReviewIssue : IComparable<ApiReviewIssue>
         if (other is null)
             return -1;
 
-        var result = -IsBlocking.CompareTo(other.IsBlocking);
+        int result = -IsBlocking.CompareTo(other.IsBlocking);
         if (result != 0)
             return result;
 
@@ -152,10 +152,10 @@ public sealed class ApiReviewIssue : IComparable<ApiReviewIssue>
         if (string.IsNullOrEmpty(y))
             return -1;
 
-        var xIsVersion = Version.TryParse(x, out var xVersion);
-        var yIsVersion = Version.TryParse(y, out var yVersion);
+        bool xIsVersion = Version.TryParse(x, out Version? xVersion);
+        bool yIsVersion = Version.TryParse(y, out Version? yVersion);
 
-        var result = -xIsVersion.CompareTo(yIsVersion);
+        int result = -xIsVersion.CompareTo(yIsVersion);
         if (result != 0)
             return result;
 

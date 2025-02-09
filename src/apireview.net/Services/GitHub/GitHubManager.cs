@@ -26,10 +26,10 @@ public sealed class GitHubManager
     {
         static bool MightBeAnApiIssue(Issue issue)
         {
-            var isClosed = issue.State.Value == ItemState.Closed;
-            var isReadyForReview = issue.Labels.Any(l => l.Name == ApiReviewConstants.ApiReadyForReview);
-            var isApproved = issue.Labels.Any(l => l.Name == ApiReviewConstants.ApiApproved);
-            var needsWork = issue.Labels.Any(l => l.Name == ApiReviewConstants.ApiNeedsWork);
+            bool isClosed = issue.State.Value == ItemState.Closed;
+            bool isReadyForReview = issue.Labels.Any(l => l.Name == ApiReviewConstants.ApiReadyForReview);
+            bool isApproved = issue.Labels.Any(l => l.Name == ApiReviewConstants.ApiApproved);
+            bool needsWork = issue.Labels.Any(l => l.Name == ApiReviewConstants.ApiNeedsWork);
             return isClosed || isReadyForReview || isApproved || needsWork;
         }
 
@@ -41,13 +41,13 @@ public sealed class GitHubManager
             const string prefix = "[Video](";
             if (body.StartsWith(prefix))
             {
-                var videoUrlEnd = body.IndexOf(")");
+                int videoUrlEnd = body.IndexOf(")");
                 if (videoUrlEnd > 0)
                 {
-                    var videoUrlStart = prefix.Length;
-                    var videoUrlLength = videoUrlEnd - videoUrlStart;
-                    var videoUrl = body.Substring(videoUrlStart, videoUrlLength);
-                    var remainingBody = body.Substring(videoUrlEnd + 1).TrimStart();
+                    int videoUrlStart = prefix.Length;
+                    int videoUrlLength = videoUrlEnd - videoUrlStart;
+                    string videoUrl = body.Substring(videoUrlStart, videoUrlLength);
+                    string remainingBody = body.Substring(videoUrlEnd + 1).TrimStart();
                     return (videoUrl, remainingBody);
                 }
             }
@@ -59,49 +59,49 @@ public sealed class GitHubManager
         //       Not a biggie though, this API is only called by people with the api-approver
         //       role, so using the app quota seems fine.
 
-        var github = await _clientFactory.CreateForAppAsync();
-        var results = new List<ApiReviewItem>();
+        GitHubClient github = await _clientFactory.CreateForAppAsync();
+        List<ApiReviewItem> results = new List<ApiReviewItem>();
 
-        foreach (var (owner, repo) in repos)
+        foreach ((string owner, string repo) in repos)
         {
-            var request = new RepositoryIssueRequest
+            RepositoryIssueRequest request = new RepositoryIssueRequest
             {
                 Filter = IssueFilter.All,
                 State = ItemStateFilter.All,
                 Since = start
             };
 
-            var issues = await github.Issue.GetAllForRepository(owner, repo, request);
+            IReadOnlyList<Issue>? issues = await github.Issue.GetAllForRepository(owner, repo, request);
 
-            foreach (var issue in issues)
+            foreach (Issue issue in issues)
             {
                 if (!MightBeAnApiIssue(issue))
                     continue;
 
-                var events = await github.Issue.Events.GetAllForIssue(owner, repo, issue.Number);
-                var reviewOutcome = ApiReviewOutcome.Get(events, start, end);
+                IReadOnlyList<IssueEvent>? events = await github.Issue.Events.GetAllForIssue(owner, repo, issue.Number);
+                ApiReviewOutcome? reviewOutcome = ApiReviewOutcome.Get(events, start, end);
 
                 if (reviewOutcome is not null)
                 {
-                    var feedbackDateTime = reviewOutcome.DecisionTime;
+                    DateTimeOffset feedbackDateTime = reviewOutcome.DecisionTime;
 
-                    var decision = reviewOutcome.Decision;
-                    var comments = await github.Issue.Comment.GetAllForIssue(owner, repo, issue.Number);
-                    var comment = comments.Where(c => start <= c.CreatedAt && c.CreatedAt <= end)
-                                          .Where(c => string.Equals(c.User.Login, reviewOutcome.DecisionMaker, StringComparison.OrdinalIgnoreCase))
-                                          .Select(c => (Comment: c, TimeDifference: Math.Abs((c.CreatedAt - feedbackDateTime).TotalSeconds)))
-                                          .OrderBy(c => c.TimeDifference)
-                                          .Select(c => c.Comment)
-                                          .FirstOrDefault();
+                    ApiReviewDecision decision = reviewOutcome.Decision;
+                    IReadOnlyList<IssueComment>? comments = await github.Issue.Comment.GetAllForIssue(owner, repo, issue.Number);
+                    IssueComment? comment = comments.Where(c => start <= c.CreatedAt && c.CreatedAt <= end).
+                        Where(c => string.Equals(c.User.Login, reviewOutcome.DecisionMaker, StringComparison.OrdinalIgnoreCase)).
+                        Select(c => (Comment: c, TimeDifference: Math.Abs((c.CreatedAt - feedbackDateTime).TotalSeconds))).
+                        OrderBy(c => c.TimeDifference).
+                        Select(c => c.Comment).
+                        FirstOrDefault();
 
-                    var feedbackId = comment?.Id.ToString();
-                    var feedbackAuthor = reviewOutcome.DecisionMaker;
-                    var feedbackUrl = comment?.HtmlUrl ?? issue.HtmlUrl;
-                    var (_, feedbackMarkdown) = ParseFeedback(comment?.Body);
+                    string? feedbackId = comment?.Id.ToString();
+                    string feedbackAuthor = reviewOutcome.DecisionMaker;
+                    string? feedbackUrl = comment?.HtmlUrl ?? issue.HtmlUrl;
+                    (_, string? feedbackMarkdown) = ParseFeedback(comment?.Body);
 
-                    var apiReviewIssue = CreateIssue(owner, repo, issue, events, end);
+                    ApiReviewIssue apiReviewIssue = CreateIssue(owner, repo, issue, events, end);
 
-                    var feedback = new ApiReviewItem(
+                    ApiReviewItem feedback = new ApiReviewItem(
                         decision: decision,
                         issue: apiReviewIssue,
                         feedbackId: feedbackId,
@@ -121,26 +121,26 @@ public sealed class GitHubManager
 
     public async Task<IReadOnlyList<ApiReviewIssue>> GetIssuesAsync()
     {
-        var repos = _repositoryGroupService.Repositories;
+        IReadOnlyList<OrgAndRepo> repos = _repositoryGroupService.Repositories;
 
-        var github = await _clientFactory.CreateForAppAsync();
-        var result = new List<ApiReviewIssue>();
+        GitHubClient github = await _clientFactory.CreateForAppAsync();
+        List<ApiReviewIssue> result = new List<ApiReviewIssue>();
 
-        foreach (var (owner, repo) in repos)
+        foreach ((string owner, string repo) in repos)
         {
-            var request = new RepositoryIssueRequest
+            RepositoryIssueRequest request = new RepositoryIssueRequest
             {
                 Filter = IssueFilter.All,
                 State = ItemStateFilter.Open
             };
             request.Labels.Add(ApiReviewConstants.ApiReadyForReview);
 
-            var issues = await github.Issue.GetAllForRepository(owner, repo, request);
+            IReadOnlyList<Issue>? issues = await github.Issue.GetAllForRepository(owner, repo, request);
 
-            foreach (var issue in issues)
+            foreach (Issue issue in issues)
             {
-                var events = await github.Issue.Events.GetAllForIssue(owner, repo, issue.Number);
-                var apiReviewIssue = CreateIssue(owner, repo, issue, events, DateTime.Now);
+                IReadOnlyList<IssueEvent>? events = await github.Issue.Events.GetAllForIssue(owner, repo, issue.Number);
+                ApiReviewIssue apiReviewIssue = CreateIssue(owner, repo, issue, events, DateTime.Now);
 
                 result.Add(apiReviewIssue);
             }
@@ -157,8 +157,8 @@ public sealed class GitHubManager
                                        string? markedBlockingBy,
                                        IReadOnlyList<string> areaOwners)
     {
-        var linkSet = _ospoService.LinkSet;
-        var result = new List<ApiReviewer>();
+        OspoLinkSet linkSet = _ospoService.LinkSet;
+        List<ApiReviewer> result = new List<ApiReviewer>();
 
         // We want to assign reviewers based on relevance,
         //
@@ -172,10 +172,10 @@ public sealed class GitHubManager
         Add(result, linkSet, markedReadyForReviewBy);
         Add(result, linkSet, author);
 
-        foreach (var assignee in assignees ?? Array.Empty<string>())
+        foreach (string assignee in assignees ?? Array.Empty<string>())
             Add(result, linkSet, assignee);
 
-        foreach (var areaOwner in areaOwners ?? Array.Empty<string>())
+        foreach (string areaOwner in areaOwners ?? Array.Empty<string>())
             Add(result, linkSet, areaOwner);
 
         return result.ToArray();
@@ -189,13 +189,13 @@ public sealed class GitHubManager
         if (target.Any(r => string.Equals(r.GitHubUserName, userName, StringComparison.OrdinalIgnoreCase)))
             return;
 
-        if (!linkSet.LinkByLogin.TryGetValue(userName, out var link))
+        if (!linkSet.LinkByLogin.TryGetValue(userName, out OspoLink? link))
         {
             _logger.LogWarning("Ignored non-OSPO linked user '{userName}'", userName);
         }
         else
         {
-            var reviewer = new ApiReviewer(
+            ApiReviewer reviewer = new ApiReviewer(
                 gitHubUserName: userName,
                 name: link.MicrosoftInfo.PreferredName,
                 email: link.MicrosoftInfo.EmailAddress
@@ -206,22 +206,22 @@ public sealed class GitHubManager
 
     private ApiReviewIssue CreateIssue(string owner, string repo, Issue issue, IReadOnlyList<IssueEvent> events, DateTimeOffset end)
     {
-        var readyEvent = ApiReadyEvent.Get(events, end);
-        var blockingEvent = ApiBlockingEvent.Get(events, end);
+        ApiReadyEvent? readyEvent = ApiReadyEvent.Get(events, end);
+        ApiBlockingEvent? blockingEvent = ApiBlockingEvent.Get(events, end);
 
-        var title = GitHubIssueHelpers.FixTitle(issue.Title);
-        var author = issue.User.Login;
-        var assignees = issue.Assignees.Select(a => a.Login).ToArray();
-        var markedReadyForReviewBy = readyEvent?.DecisionMaker;
-        var markedReadyAt = readyEvent?.CreatedAt;
-        var markedBlockingBy = blockingEvent?.DecisionMaker;
-        var markedBlockingAt = blockingEvent?.CreatedAt;
-        var areaOwners = GetAreaOwners(issue.Labels.Select(l => l.Name));
-        var milestone = issue.Milestone?.Title ?? ApiReviewConstants.NoMilestone;
-        var labels = issue.Labels.Select(l => new ApiReviewLabel(l.Name, l.Color, l.Description)).ToArray();
-        var reviewers = GetReviewers(author, assignees, markedReadyForReviewBy, markedBlockingBy, areaOwners);
+        string title = GitHubIssueHelpers.FixTitle(issue.Title);
+        string? author = issue.User.Login;
+        string[] assignees = issue.Assignees.Select(a => a.Login).ToArray();
+        string? markedReadyForReviewBy = readyEvent?.DecisionMaker;
+        DateTimeOffset? markedReadyAt = readyEvent?.CreatedAt;
+        string? markedBlockingBy = blockingEvent?.DecisionMaker;
+        DateTimeOffset? markedBlockingAt = blockingEvent?.CreatedAt;
+        string[] areaOwners = GetAreaOwners(issue.Labels.Select(l => l.Name));
+        string milestone = issue.Milestone?.Title ?? ApiReviewConstants.NoMilestone;
+        ApiReviewLabel[] labels = issue.Labels.Select(l => new ApiReviewLabel(l.Name, l.Color, l.Description)).ToArray();
+        ApiReviewer[] reviewers = GetReviewers(author, assignees, markedReadyForReviewBy, markedBlockingBy, areaOwners);
 
-        var result = new ApiReviewIssue(
+        ApiReviewIssue result = new ApiReviewIssue(
             owner,
             repo,
             issue.Number,
@@ -245,11 +245,11 @@ public sealed class GitHubManager
 
     private string[] GetAreaOwners(IEnumerable<string> labels)
     {
-        var result = new List<string>();
+        List<string> result = new List<string>();
 
-        foreach (var label in labels)
+        foreach (string label in labels)
         {
-            var owners = _areaOwnerService.GetOwners(label);
+            IReadOnlyList<string> owners = _areaOwnerService.GetOwners(label);
             result.AddRange(owners);
         }
 
@@ -274,7 +274,7 @@ public sealed class GitHubManager
             // The reason being that when an API is reviewed and marked as need-work, flipping it back to
             // ready-for-review should come back earlier, rather than later to aid review flow.
 
-            foreach (var e in events.Where(e => e.CreatedAt <= end)
+            foreach (IssueEvent e in events.Where(e => e.CreatedAt <= end)
                                     .OrderBy(e => e.CreatedAt))
             {
                 switch (e.Event.StringValue)
@@ -305,7 +305,7 @@ public sealed class GitHubManager
             // NOTE: Since we use this expedite review, we generally want to know when an issue was last labelled as
             //       blocking without maintaining its position within the blocking queue.
 
-            foreach (var e in events.Where(e => e.CreatedAt <= end)
+            foreach (IssueEvent e in events.Where(e => e.CreatedAt <= end)
                                     .OrderByDescending(e => e.CreatedAt))
             {
                 switch (e.Event.StringValue)
@@ -332,12 +332,11 @@ public sealed class GitHubManager
 
         public static ApiReviewOutcome? Get(IEnumerable<IssueEvent> events, DateTimeOffset start, DateTimeOffset end)
         {
-            var readyEvent = default(IssueEvent);
-            var current = default(ApiReviewOutcome);
-            var rejection = default(ApiReviewOutcome);
+            IssueEvent? readyEvent = default(IssueEvent);
+            ApiReviewOutcome? current = default(ApiReviewOutcome);
+            ApiReviewOutcome? rejection = default(ApiReviewOutcome);
 
-            foreach (var e in events.Where(e => e.CreatedAt <= end)
-                                    .OrderBy(e => e.CreatedAt))
+            foreach (IssueEvent e in events.Where(e => e.CreatedAt <= end).OrderBy(e => e.CreatedAt))
                 switch (e.Event.StringValue)
                 {
                     case "labeled" when string.Equals(e.Label.Name, ApiReviewConstants.ApiReadyForReview, StringComparison.OrdinalIgnoreCase):
@@ -366,7 +365,7 @@ public sealed class GitHubManager
 
             if (current is not null)
             {
-                var inInterval = start <= current.DecisionTime && current.DecisionTime <= end;
+                bool inInterval = start <= current.DecisionTime && current.DecisionTime <= end;
                 if (!inInterval)
                     return null;
             }

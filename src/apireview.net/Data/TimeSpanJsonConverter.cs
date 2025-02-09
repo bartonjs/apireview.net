@@ -7,7 +7,7 @@ public class TimeSpanJsonConverter : JsonConverter<TimeSpan>
 {
     public override TimeSpan Read(ref Utf8JsonReader reader, Type typeToConvert, JsonSerializerOptions options)
     {
-        var ticks = reader.GetInt64();
+        long ticks = reader.GetInt64();
         return new TimeSpan(ticks);
     }
 

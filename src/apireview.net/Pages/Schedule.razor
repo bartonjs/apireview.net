@@ -1,4 +1,5 @@
 ﻿@page "/schedule"
+@using ApiReviewDotNet.Services.Calendar
 
 @if (CurrentDate is not null)
 {
@@ -20,13 +21,13 @@
     <div class="calendar-cell calendar-header">Thursday</div>
     <div class="calendar-cell calendar-header">Friday</div>
     <div class="calendar-cell calendar-header">Saturday</div>
-    @foreach (var cell in Cells)
+    @foreach (CalendarCell cell in Cells)
     {
-        var isFirstCell = cell == Cells.First();
-        var includeMonth = isFirstCell || cell.DateTime.Day == 1;
-        var pastClass = cell.DateTime < Today ? "past" : "";
-        var todayClass = cell.DateTime == Today ? "today" : "";
-        var dayText = includeMonth
+        bool isFirstCell = cell == Cells.First();
+        bool includeMonth = isFirstCell || cell.DateTime.Day == 1;
+        string pastClass = cell.DateTime < Today ? "past" : "";
+        string todayClass = cell.DateTime == Today ? "today" : "";
+        string dayText = includeMonth
                 ? @cell.DateTime.ToString("MMM d")
                 : @cell.DateTime.Day.ToString();
 
@@ -36,7 +37,7 @@
             @if (cell.Entries.Any())
             {
                 <ul class="list-unstyled">
-                    @foreach (var entry in cell.Entries)
+                    @foreach (CalendarEntry entry in cell.Entries)
                     {
                         <li><span class="time">@entry.Start.ToString("t")</span> @entry.Title</li>
                     }
