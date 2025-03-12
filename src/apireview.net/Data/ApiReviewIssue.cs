@@ -152,6 +152,21 @@ public sealed class ApiReviewIssue : IComparable<ApiReviewIssue>
         if (string.IsNullOrEmpty(y))
             return -1;
 
+        if (ApiReviewConstants.NoMilestone.Equals(x))
+        {
+            if (ApiReviewConstants.NoMilestone.Equals(y))
+            {
+                return 0;
+            }
+
+            return 1;
+        }
+
+        if (ApiReviewConstants.NoMilestone.Equals(y))
+        {
+            return -1;
+        }
+
         bool xIsVersion = Version.TryParse(x, out Version? xVersion);
         bool yIsVersion = Version.TryParse(y, out Version? yVersion);
 
