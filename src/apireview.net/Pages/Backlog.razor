@@ -132,3 +132,10 @@
         </div>
     }
 </div>
+<AuthorizeView Roles="@ApiReviewConstants.ApiApproverRole">
+    <div class="form-group row">
+        <div class="col-sm-10">
+            <button class="btn btn-secondary" disabled="@(!CanRefresh)" @onclick="RefreshAsync">Force Refresh</button>
+        </div>
+    </div>
+</AuthorizeView>

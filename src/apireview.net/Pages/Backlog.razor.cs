@@ -28,6 +28,7 @@ public sealed partial class Backlog : IDisposable
     private string _filter = null!;
     private SortedDictionary<string, bool> _milestones = null!;
     private readonly HashSet<ApiReviewIssue> _checkedIssues = new();
+    private Task? _refresh;
 
     private RepositoryGroup SelectedGroup
     {
@@ -274,5 +275,18 @@ public sealed partial class Backlog : IDisposable
             _checkedIssues.Add(issue);
         else
             _checkedIssues.Remove(issue);
+    }
+
+    public bool CanRefresh => _refresh is null;
+
+    public Task RefreshAsync()
+    {
+        return (_refresh = RefreshAsyncCore());
+
+        async Task RefreshAsyncCore()
+        {
+            await IssueService.ReloadAsync();
+            _refresh = null;
+        }
     }
 }
