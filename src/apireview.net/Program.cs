@@ -20,7 +20,8 @@ builder.Services.AddRazorPages().AddJsonOptions(o =>
 {
     o.JsonSerializerOptions.Converters.Add(new TimeSpanJsonConverter());
 });
-builder.Services.AddServerSideBlazor();
+builder.Services.AddRazorComponents();
+builder.Services.AddCascadingAuthenticationState();
 builder.Services.AddControllers();
 builder.Services.AddSingleton<IssueService>();
 builder.Services.AddSingleton<GitHubClientFactory>();
@@ -64,7 +65,7 @@ builder.Services.AddAuthentication(options =>
         RepositoryGroupService groupService = context.HttpContext.RequestServices.GetRequiredService<RepositoryGroupService>();
         GitHubMembershipService membershipService = context.HttpContext.RequestServices.GetRequiredService<GitHubMembershipService>();
 
-        string accessToken = context.AccessToken;
+        string? accessToken = context.AccessToken;
         string orgName = ApiReviewConstants.ApiApproverOrgName;
         IReadOnlyList<string> teamSlugs = groupService.ApproverTeamSlugs;
         if (accessToken is not null && context.Identity?.Name is not null)
@@ -101,14 +102,12 @@ app.UseHostRedirection("apireview.azurewebsites.net", "apireview.net");
 app.UseHttpsRedirection();
 app.UseStaticFiles();
 
-app.UseRouting();
-
 app.UseAuthentication();
 app.UseAuthorization();
+app.UseAntiforgery();
 
-app.MapBlazorHub();
 app.MapDefaultControllerRoute();
 app.MapGitHubWebhooks();
-app.MapFallbackToPage("/_Host");
+app.MapRazorComponents<App>();
 
 app.Run();
