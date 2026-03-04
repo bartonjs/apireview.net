@@ -7,11 +7,11 @@
         <div class="dropdown-menu">
             @foreach (RepositoryGroup rg in RepositoryGroupService.RepositoryGroups)
             {
-                <a class="dropdown-item" href="?g=@Uri.EscapeDataString(rg.Name)">@rg.DisplayName</a>
+                <a class="dropdown-item" href="/?g=@Uri.EscapeDataString(rg.Name)">@rg.DisplayName</a>
             }
         </div>
     </div>
-    <form method="get" class="flex-grow-1 d-flex">
+    <form method="get" action="/" class="flex-grow-1 d-flex">
         @if (SelectedGroup != RepositoryGroupService.Default)
         {
             <input type="hidden" name="g" value="@SelectedGroup.Name" />
@@ -70,7 +70,7 @@
                         <button class="btn btn-sm dropdown-toggle" type="button" id="dropdownMenuButton" data-toggle="dropdown" aria-haspopup="true" aria-expanded="false">
                             Milestones
                         </button>
-                        <form method="get" class="dropdown-menu dropdown-menu-right p-2" id="milestone-form" aria-labelledby="dropdownMenuButton">
+                        <form method="get" action="/" class="dropdown-menu dropdown-menu-right p-2" id="milestone-form" aria-labelledby="dropdownMenuButton">
                             <input type="hidden" name="m_submitted" value="1" />
                             @if (SelectedGroup != RepositoryGroupService.Default)
                             {

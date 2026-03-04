@@ -4,9 +4,9 @@
 @if (Cells.Length > 0)
 {
     <div class="calendar-nav">
-        <a class="btn btn-secondary btn-sm" href="?month=@CurrentDate.AddMonths(-1).ToString("yyyy-MM")"><span class="oi oi-arrow-left"></span></a>
+        <a class="btn btn-secondary btn-sm" href="/schedule?month=@CurrentDate.AddMonths(-1).ToString("yyyy-MM")"><span class="oi oi-arrow-left"></span></a>
         <a class="btn btn-secondary btn-sm" href="/schedule">Today</a>
-        <a class="btn btn-secondary btn-sm" href="?month=@CurrentDate.AddMonths(1).ToString("yyyy-MM")"><span class="oi oi-arrow-right"></span></a>
+        <a class="btn btn-secondary btn-sm" href="/schedule?month=@CurrentDate.AddMonths(1).ToString("yyyy-MM")"><span class="oi oi-arrow-right"></span></a>
         <h3>@CurrentDate.ToString("MMMM yyyy")</h3>
     </div>
 }
