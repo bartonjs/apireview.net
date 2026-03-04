@@ -34,7 +34,7 @@ builder.Services.AddSingleton<YouTubeManager>();
 builder.Services.AddSingleton<GitHubMembershipService>();
 builder.Services.AddSingleton<GitHubManager>();
 builder.Services.AddSingleton<GitHubTeamService>();
-builder.Services.AddSingleton<RefreshService>();
+builder.Services.AddHostedService<RefreshService>();
 
 //builder.Configuration.AddAzureKeyVault(
 //    new Uri($"https://{builder.Configuration["KeyVaultName"]}.vault.azure.net/"),
@@ -80,10 +80,6 @@ builder.Services.AddAuthentication(options =>
 builder.Services.AddHttpClient();
 
 WebApplication app = builder.Build();
-
-// Warm up services
-RefreshService refreshService = app.Services.GetRequiredService<RefreshService>();
-await refreshService.StartAsync();
 
 if (app.Environment.IsDevelopment())
 {
