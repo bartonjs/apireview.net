@@ -20,7 +20,8 @@ builder.Services.AddRazorPages().AddJsonOptions(o =>
 {
     o.JsonSerializerOptions.Converters.Add(new TimeSpanJsonConverter());
 });
-builder.Services.AddRazorComponents();
+builder.Services.AddRazorComponents()
+    .AddInteractiveServerComponents();
 builder.Services.AddCascadingAuthenticationState();
 builder.Services.AddControllers();
 builder.Services.AddSingleton<IssueService>();
@@ -44,7 +45,6 @@ builder.Services.AddSingleton<RefreshService>();
 builder.Services.AddSingleton<SummaryManager>();
 builder.Services.AddSingleton<SummaryPublishingService>();
 
-builder.Services.AddScoped<TimeZoneService>();
 builder.Services.AddScoped<NotesService>();
 builder.Services.AddAuthentication(options =>
 {
@@ -108,6 +108,7 @@ app.UseAntiforgery();
 
 app.MapDefaultControllerRoute();
 app.MapGitHubWebhooks();
-app.MapRazorComponents<App>();
+app.MapRazorComponents<App>()
+    .AddInteractiveServerRenderMode();
 
 app.Run();

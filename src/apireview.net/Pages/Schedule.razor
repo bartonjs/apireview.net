@@ -1,17 +1,17 @@
 ﻿@page "/schedule"
 @using ApiReviewDotNet.Services.Calendar
 
-@if (CurrentDate is not null)
+@if (Cells.Length > 0)
 {
     <div class="calendar-nav">
-        <button class="btn btn-secondary btn-sm" @onclick="PreviousMonthAsync"><span class="oi oi-arrow-left"></span></button>
-        <button class="btn btn-secondary btn-sm" @onclick="TodayAsync">Today</button>
-        <button class="btn btn-secondary btn-sm" @onclick="NextMonthAsync"><span class="oi oi-arrow-right"></span></button>
-        <h3>@CurrentDate.Value.ToString("MMMM yyyy")</h3>
+        <a class="btn btn-secondary btn-sm" href="?month=@CurrentDate.AddMonths(-1).ToString("yyyy-MM")"><span class="oi oi-arrow-left"></span></a>
+        <a class="btn btn-secondary btn-sm" href="/schedule">Today</a>
+        <a class="btn btn-secondary btn-sm" href="?month=@CurrentDate.AddMonths(1).ToString("yyyy-MM")"><span class="oi oi-arrow-right"></span></a>
+        <h3>@CurrentDate.ToString("MMMM yyyy")</h3>
     </div>
 }
 
-@if (Cells is not null)
+@if (Cells.Length > 0)
 {
 <div class="calendar">
     <div class="calendar-cell calendar-header">Sunday</div>
@@ -31,7 +31,7 @@
                 ? @cell.DateTime.ToString("MMM d")
                 : @cell.DateTime.Day.ToString();
 
-        <div class="calendar-cell @pastClass @todayClass">
+        <div class="calendar-cell @pastClass @todayClass" data-date="@cell.DateTime.ToString("yyyy-MM-dd")">
             <div class="calendar-day">@dayText</div>
 
             @if (cell.Entries.Any())
@@ -39,7 +39,7 @@
                 <ul class="list-unstyled">
                     @foreach (CalendarEntry entry in cell.Entries)
                     {
-                        <li><span class="time">@entry.Start.ToString("t")</span> @entry.Title</li>
+                        <li><span class="time"><time datetime="@entry.Start.ToString("o")">@entry.Start.ToString("t")</time></span> @entry.Title</li>
                     }
                 </ul>
             }
@@ -52,3 +52,24 @@
     Videos are streamed to the <a href="https://www.youtube.com/@@NETFoundation/streams">.NET Foundation YouTube channel</a>.
     This calendar is available <a href="@CalendarService.Url">as an .ics file</a> you can add to your favorite calendar app.
 </p>
+
+<script>
+    (function () {
+        // Update <time> elements to user's local time
+        document.querySelectorAll('time[datetime]').forEach(function (el) {
+            var dt = new Date(el.getAttribute('datetime'));
+            el.textContent = dt.toLocaleTimeString([], { hour: 'numeric', minute: '2-digit' });
+        });
+
+        // Re-highlight today/past cells using the user's local date
+        var now = new Date();
+        var todayStr = now.getFullYear() + '-' +
+            String(now.getMonth() + 1).padStart(2, '0') + '-' +
+            String(now.getDate()).padStart(2, '0');
+        document.querySelectorAll('[data-date]').forEach(function (el) {
+            var d = el.getAttribute('data-date');
+            el.classList.toggle('today', d === todayStr);
+            el.classList.toggle('past', d < todayStr);
+        });
+    })();
+</script>
