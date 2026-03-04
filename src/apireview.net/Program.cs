@@ -8,22 +8,20 @@ using ApiReviewDotNet.Services.GitHub;
 using ApiReviewDotNet.Services.Ospo;
 using ApiReviewDotNet.Services.YouTube;
 
+using AspNet.Security.OAuth.GitHub;
 using Azure.Identity;
+using Microsoft.AspNetCore.Antiforgery;
 using Microsoft.AspNetCore.Authentication;
 using Microsoft.AspNetCore.Authentication.Cookies;
+using Microsoft.AspNetCore.Authorization;
 using Octokit.Webhooks;
 using Octokit.Webhooks.AspNetCore;
 
 WebApplicationBuilder builder = WebApplication.CreateBuilder(args);
 
-builder.Services.AddRazorPages().AddJsonOptions(o =>
-{
-    o.JsonSerializerOptions.Converters.Add(new TimeSpanJsonConverter());
-});
 builder.Services.AddRazorComponents()
     .AddInteractiveServerComponents();
 builder.Services.AddCascadingAuthenticationState();
-builder.Services.AddControllers();
 builder.Services.AddSingleton<IssueService>();
 builder.Services.AddSingleton<GitHubClientFactory>();
 builder.Services.AddSingleton<YouTubeServiceFactory>();
@@ -106,7 +104,30 @@ app.UseAuthentication();
 app.UseAuthorization();
 app.UseAntiforgery();
 
-app.MapDefaultControllerRoute();
+app.MapGet("/signin", (string? returnUrl) =>
+    Results.Challenge(
+        new AuthenticationProperties { RedirectUri = "/" + returnUrl },
+        [GitHubAuthenticationDefaults.AuthenticationScheme]));
+
+app.MapGet("/signout", () =>
+    Results.SignOut(
+        new AuthenticationProperties { RedirectUri = "/" },
+        [CookieAuthenticationDefaults.AuthenticationScheme]));
+
+app.MapPost("/signout", () =>
+    Results.SignOut(
+        new AuthenticationProperties { RedirectUri = "/" },
+        [CookieAuthenticationDefaults.AuthenticationScheme]));
+
+app.MapPost("/admin/force-refresh",
+    [Authorize(Roles = ApiReviewConstants.ApiApproverRole)]
+    [RequireAntiforgeryToken]
+    async (IssueService issueService) =>
+    {
+        await issueService.ReloadAsync();
+        return Results.Redirect("/");
+    });
+
 app.MapGitHubWebhooks();
 app.MapRazorComponents<App>()
     .AddInteractiveServerRenderMode();
