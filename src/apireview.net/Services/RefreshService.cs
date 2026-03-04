@@ -28,10 +28,14 @@ public sealed class RefreshService : BackgroundService
         _issueService = issueService;
     }
 
-    protected override async Task ExecuteAsync(CancellationToken stoppingToken)
+    public override async Task StartAsync(CancellationToken cancellationToken)
     {
         await ReloadAsync();
+        await base.StartAsync(cancellationToken);
+    }
 
+    protected override async Task ExecuteAsync(CancellationToken stoppingToken)
+    {
         using PeriodicTimer timer = new(_refreshInterval);
 
         try

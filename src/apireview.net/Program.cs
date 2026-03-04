@@ -94,11 +94,12 @@ else
 app.UseHostRedirection("apireview.azurewebsites.net", "apireview.net");
 
 app.UseHttpsRedirection();
-app.UseStaticFiles();
 
 app.UseAuthentication();
 app.UseAuthorization();
 app.UseAntiforgery();
+
+app.MapStaticAssets();
 
 app.MapGet("/signin", (string? returnUrl) =>
     Results.Challenge(
