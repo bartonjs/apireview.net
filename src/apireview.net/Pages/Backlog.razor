@@ -7,16 +7,15 @@
         <div class="dropdown-menu">
             @foreach (RepositoryGroup rg in RepositoryGroupService.RepositoryGroups)
             {
-                <a class="dropdown-item" href="/?g=@Uri.EscapeDataString(rg.Name)">@rg.DisplayName</a>
+                <a class="dropdown-item" href="@CurrentPath?g=@Uri.EscapeDataString(rg.Name)">@rg.DisplayName</a>
             }
         </div>
     </div>
-    <form method="get" action="/" class="flex-grow-1 d-flex">
+    <form method="get" action="@CurrentPath" class="flex-grow-1 d-flex">
         @if (SelectedGroup != RepositoryGroupService.Default)
         {
             <input type="hidden" name="g" value="@SelectedGroup.Name" />
         }
-        <input type="hidden" name="m_submitted" value="1" />
         @foreach ((string k, bool v) in _milestones.Where(m => m.Value))
         {
             <input type="hidden" name="m" value="@k" />
@@ -67,11 +66,10 @@
             {
                 <div class="mr-2 float-right">
                     <div class="dropdown">
-                        <button class="btn btn-sm dropdown-toggle" type="button" id="dropdownMenuButton" data-toggle="dropdown" aria-haspopup="true" aria-expanded="false">
+                        <button class="btn btn-sm dropdown-toggle" type="button" id="milestone-dropdown-btn" data-toggle="dropdown" aria-haspopup="true" aria-expanded="false">
                             Milestones
                         </button>
-                        <form method="get" action="/" class="dropdown-menu dropdown-menu-right p-2" id="milestone-form" aria-labelledby="dropdownMenuButton">
-                            <input type="hidden" name="m_submitted" value="1" />
+                        <form method="get" action="@CurrentPath" class="dropdown-menu dropdown-menu-right p-2" id="milestone-form" aria-labelledby="milestone-dropdown-btn">
                             <input type="hidden" name="milestones_open" value="1" />
                             @if (SelectedGroup != RepositoryGroupService.Default)
                             {
@@ -82,14 +80,14 @@
                                 <input type="hidden" name="q" value="@Filter" />
                             }
 
-                            <a class="dropdown-item" href="@SelectAllMilestonesUrl">Select All</a>
-                            <a class="dropdown-item" href="@SelectNoneMilestonesUrl">Select None</a>
+                            <button type="button" class="dropdown-item" id="select-all-milestones">Select All</button>
+                            <button type="button" class="dropdown-item" id="select-none-milestones">Select None</button>
                             <div class="dropdown-divider"></div>
 
                             @foreach ((string k, bool v) in _milestones)
                             {
                                 <div class="m-2 checkbox">
-                                    <label><input class="mr-2" type="checkbox" name="m" value="@k" checked="@(v ? "checked" : null)" onchange="this.form.submit()">@k</label>
+                                    <label><input class="mr-2" type="checkbox" name="m" value="@k" checked="@(v ? "checked" : null)" onchange="window.submitMilestoneForm()">@k</label>
                                 </div>
                             }
                         </form>
@@ -159,6 +157,38 @@
 </AuthorizeView>
 
 <script>
+    // Global: called from checkbox onchange attributes
+    window.submitMilestoneForm = function () {
+        var form = document.getElementById('milestone-form');
+        if (!form) return;
+        var allBoxes = form.querySelectorAll('input[name="m"]');
+        var checkedBoxes = form.querySelectorAll('input[name="m"]:checked');
+        var mNone = form.querySelector('input[name="m_none"]');
+        if (checkedBoxes.length === allBoxes.length) {
+            // All checked — navigate to clean URL (no m params = server default = all milestones)
+            var params = new URLSearchParams();
+            var gInput = form.querySelector('input[name="g"]');
+            var qInput = form.querySelector('input[name="q"]');
+            if (gInput) params.set('g', gInput.value);
+            if (qInput) params.set('q', qInput.value);
+            params.set('milestones_open', '1');
+            window.location.href = form.action + '?' + params.toString();
+            return;
+        }
+        if (checkedBoxes.length === 0) {
+            if (!mNone) {
+                mNone = document.createElement('input');
+                mNone.type = 'hidden';
+                mNone.name = 'm_none';
+                mNone.value = '1';
+                form.appendChild(mNone);
+            }
+        } else {
+            if (mNone) mNone.remove();
+        }
+        form.submit();
+    };
+
     (function () {
         var selectAll = document.getElementById('select-all-issues');
         var countDisplay = document.getElementById('issue-count-display');
@@ -205,16 +235,30 @@
             params.delete('milestones_open');
             var newUrl = window.location.pathname + (params.toString() ? '?' + params.toString() : '');
             history.replaceState(null, '', newUrl);
-            var btn = document.getElementById('dropdownMenuButton');
-            if (btn) {
-                var container = btn.closest('.dropdown');
-                var menu = document.getElementById('milestone-form');
-                if (container && menu) {
-                    container.classList.add('show');
-                    menu.classList.add('show');
-                    btn.setAttribute('aria-expanded', 'true');
+            // Use DOMContentLoaded so jQuery + Bootstrap JS are loaded before calling dropdown('show')
+            document.addEventListener('DOMContentLoaded', function () {
+                var btn = document.getElementById('milestone-dropdown-btn');
+                if (btn) {
+                    $(btn).dropdown('show');
                 }
-            }
+            });
+        }
+
+        // Select All / Select None milestone buttons
+        var milestoneForm = document.getElementById('milestone-form');
+        var selectAllMilestones = document.getElementById('select-all-milestones');
+        var selectNoneMilestones = document.getElementById('select-none-milestones');
+        if (selectAllMilestones && milestoneForm) {
+            selectAllMilestones.addEventListener('click', function () {
+                milestoneForm.querySelectorAll('input[name="m"]').forEach(function (cb) { cb.checked = true; });
+                window.submitMilestoneForm();
+            });
+        }
+        if (selectNoneMilestones && milestoneForm) {
+            selectNoneMilestones.addEventListener('click', function () {
+                milestoneForm.querySelectorAll('input[name="m"]').forEach(function (cb) { cb.checked = false; });
+                window.submitMilestoneForm();
+            });
         }
 
         if (copyAction) {

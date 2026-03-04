@@ -28,8 +28,7 @@ public sealed partial class Backlog : IDisposable
     public IReadOnlyList<ApiReviewIssue> Issues => IssueService.Issues;
     public IEnumerable<ApiReviewIssue> VisibleIssues => Issues.Where(IsVisible);
 
-    public string SelectAllMilestonesUrl => BuildMilestoneUrl();
-    public string SelectNoneMilestonesUrl => BuildMilestoneUrl("m=__none__");
+    public string CurrentPath => NavigationManager.ToAbsoluteUri(NavigationManager.Uri).AbsolutePath;
 
     public int GetRank(ApiReviewIssue issue)
     {
@@ -62,25 +61,14 @@ public sealed partial class Backlog : IDisposable
         if (queryParameters.TryGetValue("q", out StringValues q))
             _filter = q!;
 
-        // m_submitted sentinel distinguishes form POST (where unchecked = absent) from direct URL nav.
-        // Without the sentinel, no m params = all milestones selected (default).
-        if (queryParameters.ContainsKey("m_submitted"))
+        // m_none=1 means no milestones selected; m=value means specific milestones; neither means all (default).
+        if (queryParameters.ContainsKey("m_none"))
         {
             foreach (string m in _milestones.Keys.ToArray())
                 _milestones[m] = false;
-
-            if (queryParameters.TryGetValue("m", out StringValues submittedMilestones))
-            {
-                foreach (string? m in submittedMilestones)
-                {
-                    if (_milestones.ContainsKey(m!))
-                        _milestones[m!] = true;
-                }
-            }
         }
         else if (queryParameters.TryGetValue("m", out StringValues selectedMilestones))
         {
-            // Direct URL navigation (Select All/None links or manual URL)
             foreach (string m in _milestones.Keys.ToArray())
                 _milestones[m] = false;
 
@@ -97,19 +85,6 @@ public sealed partial class Backlog : IDisposable
     public void Dispose()
     {
         IssueService.Changed -= IssuesChanged;
-    }
-
-    private string BuildMilestoneUrl(string? extraParam = null)
-    {
-        string path = NavigationManager.ToAbsoluteUri(NavigationManager.Uri).AbsolutePath;
-        var parts = new List<string>();
-        if (_selectedGroup != RepositoryGroupService.Default)
-            parts.Add($"g={Uri.EscapeDataString(_selectedGroup.Name)}");
-        if (!string.IsNullOrEmpty(_filter))
-            parts.Add($"q={Uri.EscapeDataString(_filter)}");
-        if (extraParam != null)
-            parts.Add(extraParam);
-        return parts.Count > 0 ? $"{path}?{string.Join("&", parts)}" : path;
     }
 
     private void LoadData()
