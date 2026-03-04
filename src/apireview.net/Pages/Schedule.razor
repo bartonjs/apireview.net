@@ -55,10 +55,24 @@
 
 <script>
     (function () {
-        // Update <time> elements to user's local time
+        // Update <time> elements to user's local time,
+        // but if the date would differ keep Pacific time and show PST/PDT
         document.querySelectorAll('time[datetime]').forEach(function (el) {
-            var dt = new Date(el.getAttribute('datetime'));
-            el.textContent = dt.toLocaleTimeString([], { hour: 'numeric', minute: '2-digit' });
+            var isoStr = el.getAttribute('datetime');
+            var dt = new Date(isoStr);
+            var cell = el.closest('[data-date]');
+            var cellDate = cell ? cell.getAttribute('data-date') : null;
+            var localDate = dt.getFullYear() + '-' +
+                String(dt.getMonth() + 1).padStart(2, '0') + '-' +
+                String(dt.getDate()).padStart(2, '0');
+            if (cellDate && localDate !== cellDate) {
+                // Date would change — keep Pacific time; label it PST or PDT from the offset
+                var offsetMatch = isoStr.match(/([+-]\d{2}):\d{2}$/);
+                var tzLabel = (offsetMatch && offsetMatch[1] === '-07') ? 'PDT' : 'PST';
+                el.textContent = el.textContent + '\u00a0' + tzLabel;
+            } else {
+                el.textContent = dt.toLocaleTimeString([], { hour: 'numeric', minute: '2-digit' });
+            }
         });
 
         // Re-highlight today/past cells using the user's local date
