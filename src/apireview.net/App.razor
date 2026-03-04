@@ -44,24 +44,5 @@
     <script src="_framework/blazor.web.js"></script>
     <script src="https://ajax.googleapis.com/ajax/libs/jquery/3.3.1/jquery.min.js"></script>
     <script src="js/bootstrap.bundle.min.js"></script>
-
-    <script>
-        window.clipboardCopy = {
-            copyText: function(text, html) {
-                const listener = function (ev) {
-                    ev.preventDefault();
-                    ev.clipboardData.setData('text/plain', text);
-                    ev.clipboardData.setData('text/html', html);
-                };
-                document.addEventListener('copy', listener);
-                document.execCommand('copy');
-                document.removeEventListener('copy', listener);
-            }
-        };
-
-        window.getTimezoneOffset = function() {
-            return new Date().getTimezoneOffset();
-        }
-    </script>
 </body>
 </html>

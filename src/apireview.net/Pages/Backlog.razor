@@ -72,6 +72,7 @@
                         </button>
                         <form method="get" action="/" class="dropdown-menu dropdown-menu-right p-2" id="milestone-form" aria-labelledby="dropdownMenuButton">
                             <input type="hidden" name="m_submitted" value="1" />
+                            <input type="hidden" name="milestones_open" value="1" />
                             @if (SelectedGroup != RepositoryGroupService.Default)
                             {
                                 <input type="hidden" name="g" value="@SelectedGroup.Name" />
@@ -198,6 +199,24 @@
             }
         });
 
+        // Re-open milestone dropdown if the form was just submitted
+        var params = new URLSearchParams(window.location.search);
+        if (params.get('milestones_open') === '1') {
+            params.delete('milestones_open');
+            var newUrl = window.location.pathname + (params.toString() ? '?' + params.toString() : '');
+            history.replaceState(null, '', newUrl);
+            var btn = document.getElementById('dropdownMenuButton');
+            if (btn) {
+                var container = btn.closest('.dropdown');
+                var menu = document.getElementById('milestone-form');
+                if (container && menu) {
+                    container.classList.add('show');
+                    menu.classList.add('show');
+                    btn.setAttribute('aria-expanded', 'true');
+                }
+            }
+        }
+
         if (copyAction) {
             copyAction.addEventListener('click', function (e) {
                 e.preventDefault();
@@ -212,9 +231,7 @@
                     }
                 });
                 var text = lines.join('\n');
-                if (window.clipboardCopy) {
-                    window.clipboardCopy.copyText(text, text);
-                }
+                navigator.clipboard.writeText(text);
                 document.querySelectorAll('.issue-checkbox').forEach(function (cb) { cb.checked = false; });
                 updateSelectionUI();
             });
