@@ -8,20 +8,20 @@ using ApiReviewDotNet.Services.GitHub;
 using ApiReviewDotNet.Services.Ospo;
 using ApiReviewDotNet.Services.YouTube;
 
+using AspNet.Security.OAuth.GitHub;
 using Azure.Identity;
+using Microsoft.AspNetCore.Antiforgery;
 using Microsoft.AspNetCore.Authentication;
 using Microsoft.AspNetCore.Authentication.Cookies;
+using Microsoft.AspNetCore.Authorization;
 using Octokit.Webhooks;
 using Octokit.Webhooks.AspNetCore;
 
 WebApplicationBuilder builder = WebApplication.CreateBuilder(args);
 
-builder.Services.AddRazorPages().AddJsonOptions(o =>
-{
-    o.JsonSerializerOptions.Converters.Add(new TimeSpanJsonConverter());
-});
-builder.Services.AddServerSideBlazor();
-builder.Services.AddControllers();
+builder.Services.AddRazorComponents()
+    .AddInteractiveServerComponents();
+builder.Services.AddCascadingAuthenticationState();
 builder.Services.AddSingleton<IssueService>();
 builder.Services.AddSingleton<GitHubClientFactory>();
 builder.Services.AddSingleton<YouTubeServiceFactory>();
@@ -34,7 +34,7 @@ builder.Services.AddSingleton<YouTubeManager>();
 builder.Services.AddSingleton<GitHubMembershipService>();
 builder.Services.AddSingleton<GitHubManager>();
 builder.Services.AddSingleton<GitHubTeamService>();
-builder.Services.AddSingleton<RefreshService>();
+builder.Services.AddHostedService<RefreshService>();
 
 //builder.Configuration.AddAzureKeyVault(
 //    new Uri($"https://{builder.Configuration["KeyVaultName"]}.vault.azure.net/"),
@@ -43,7 +43,6 @@ builder.Services.AddSingleton<RefreshService>();
 builder.Services.AddSingleton<SummaryManager>();
 builder.Services.AddSingleton<SummaryPublishingService>();
 
-builder.Services.AddScoped<TimeZoneService>();
 builder.Services.AddScoped<NotesService>();
 builder.Services.AddAuthentication(options =>
 {
@@ -64,7 +63,7 @@ builder.Services.AddAuthentication(options =>
         RepositoryGroupService groupService = context.HttpContext.RequestServices.GetRequiredService<RepositoryGroupService>();
         GitHubMembershipService membershipService = context.HttpContext.RequestServices.GetRequiredService<GitHubMembershipService>();
 
-        string accessToken = context.AccessToken;
+        string? accessToken = context.AccessToken;
         string orgName = ApiReviewConstants.ApiApproverOrgName;
         IReadOnlyList<string> teamSlugs = groupService.ApproverTeamSlugs;
         if (accessToken is not null && context.Identity?.Name is not null)
@@ -82,10 +81,6 @@ builder.Services.AddHttpClient();
 
 WebApplication app = builder.Build();
 
-// Warm up services
-RefreshService refreshService = app.Services.GetRequiredService<RefreshService>();
-await refreshService.StartAsync();
-
 if (app.Environment.IsDevelopment())
 {
     app.UseDeveloperExceptionPage();
@@ -99,16 +94,39 @@ else
 app.UseHostRedirection("apireview.azurewebsites.net", "apireview.net");
 
 app.UseHttpsRedirection();
-app.UseStaticFiles();
-
-app.UseRouting();
 
 app.UseAuthentication();
 app.UseAuthorization();
+app.UseAntiforgery();
 
-app.MapBlazorHub();
-app.MapDefaultControllerRoute();
+app.MapStaticAssets();
+
+app.MapGet("/signin", (string? returnUrl) =>
+    Results.Challenge(
+        new AuthenticationProperties { RedirectUri = "/" + returnUrl },
+        [GitHubAuthenticationDefaults.AuthenticationScheme]));
+
+app.MapGet("/signout", () =>
+    Results.SignOut(
+        new AuthenticationProperties { RedirectUri = "/" },
+        [CookieAuthenticationDefaults.AuthenticationScheme]));
+
+app.MapPost("/signout", () =>
+    Results.SignOut(
+        new AuthenticationProperties { RedirectUri = "/" },
+        [CookieAuthenticationDefaults.AuthenticationScheme]));
+
+app.MapPost("/admin/force-refresh",
+    [Authorize(Roles = ApiReviewConstants.ApiApproverRole)]
+    [RequireAntiforgeryToken]
+    async (IssueService issueService) =>
+    {
+        await issueService.ReloadAsync();
+        return Results.Redirect("/");
+    });
+
 app.MapGitHubWebhooks();
-app.MapFallbackToPage("/_Host");
+app.MapRazorComponents<App>()
+    .AddInteractiveServerRenderMode();
 
 app.Run();

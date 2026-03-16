@@ -1,9 +1,11 @@
 using ApiReviewDotNet.Services.GitHub;
 using ApiReviewDotNet.Services.Ospo;
 
+using Microsoft.Extensions.Hosting;
+
 namespace ApiReviewDotNet.Services;
 
-public sealed class RefreshService
+public sealed class RefreshService : BackgroundService
 {
     private static readonly TimeSpan _refreshInterval = TimeSpan.FromHours(1);
 
@@ -26,17 +28,30 @@ public sealed class RefreshService
         _issueService = issueService;
     }
 
-    public async Task StartAsync()
+    public override async Task StartAsync(CancellationToken cancellationToken)
     {
         await ReloadAsync();
-
-        _ = Task.Run(async () => {
-            await Task.Delay(_refreshInterval);
-            await ReloadAsync();
-        });
+        await base.StartAsync(cancellationToken);
     }
 
-    public async Task ReloadAsync()
+    protected override async Task ExecuteAsync(CancellationToken stoppingToken)
+    {
+        using PeriodicTimer timer = new(_refreshInterval);
+
+        try
+        {
+            while (await timer.WaitForNextTickAsync(stoppingToken))
+            {
+                await ReloadAsync();
+            }
+        }
+        catch (OperationCanceledException)
+        {
+            _logger.LogInformation("RefreshService is stopping.");
+        }
+    }
+
+    private async Task ReloadAsync()
     {
         try
         {

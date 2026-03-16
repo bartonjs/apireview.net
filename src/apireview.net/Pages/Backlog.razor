@@ -7,80 +7,90 @@
         <div class="dropdown-menu">
             @foreach (RepositoryGroup rg in RepositoryGroupService.RepositoryGroups)
             {
-                <button class="dropdown-item" @onclick="_ => SelectedGroup = rg">@rg.DisplayName</button>
+                <a class="dropdown-item" href="@CurrentPath?g=@Uri.EscapeDataString(rg.Name)">@rg.DisplayName</a>
             }
         </div>
     </div>
-    <input class="form-control" type="text" placeholder="Filter" @bind="Filter" @bind:event="oninput">
+    <form method="get" action="@CurrentPath" class="flex-grow-1 d-flex">
+        @if (SelectedGroup != RepositoryGroupService.Default)
+        {
+            <input type="hidden" name="g" value="@SelectedGroup.Name" />
+        }
+        @foreach ((string k, bool v) in _milestones.Where(m => m.Value))
+        {
+            <input type="hidden" name="m" value="@k" />
+        }
+        <input class="form-control" type="text" name="q" placeholder="Filter" value="@Filter" />
+    </form>
 </div>
 
 <div class="gh-issue-header">
     <div class="row no-gutters">
 
         <div class="col-auto align-self-center">
-            @{
-                bool isChecked = _checkedIssues.Count == Issues.Count;
-            }
-            <input class="ml-2 mr-3" type="checkbox" value="@isChecked" @onchange="e => CheckAllIssues((bool)e.Value!)" />
+            <input class="ml-2 mr-3" type="checkbox" id="select-all-issues" />
         </div>
 
         <div class="col align-self-center">
-            @if (_checkedIssues.Count == 0)
-            {
-                <p class="text-muted m-0">
-                    @{
-                        int numberOfOrgs = Issues.Select(i => i.Owner).Distinct().Count();
-                        int numberOfRepos = Issues.Select(i => i.Repo).Distinct().Count();
-                        int visibleIssues = VisibleIssues.Count(IsVisible);
-                    }
+            <p class="text-muted m-0" id="issue-count-display">
+                @{
+                    int numberOfOrgs = Issues.Select(i => i.Owner).Distinct().Count();
+                    int numberOfRepos = Issues.Select(i => i.Repo).Distinct().Count();
+                    int visibleIssues = VisibleIssues.Count(IsVisible);
+                }
 
-                    @if (visibleIssues == Issues.Count)
-                    {
-                        <text>
-                            @Issues.Count issues across @numberOfOrgs orgs and @numberOfRepos repos
-                        </text>
-                    }
-                    else
-                    {
-                        <text>
-                            @visibleIssues of @Issues.Count issues across @numberOfOrgs orgs and @numberOfRepos repos
-                        </text>
-                    }
-                </p>
-            }
-            else
-            {
-                <div class="dropdown">
-                    <button class="btn btn-secondary btn-sm" type="button" id="dropdownMenuButton" data-toggle="dropdown" aria-haspopup="true" aria-expanded="false">
-                        @SelectedIssues.Count() items selected...
-                    </button>
-                    <div class="dropdown-menu dropdown-menu-right" aria-labelledby="dropdownMenuButton">
-                        <a class="dropdown-item" href="#" @onclick:preventDefault @onclick="() => CopySelectedItems()">Copy links</a>
-                    </div>
+                @if (visibleIssues == Issues.Count)
+                {
+                    <text>
+                        @Issues.Count issues across @numberOfOrgs orgs and @numberOfRepos repos
+                    </text>
+                }
+                else
+                {
+                    <text>
+                        @visibleIssues of @Issues.Count issues across @numberOfOrgs orgs and @numberOfRepos repos
+                    </text>
+                }
+            </p>
+            <div class="dropdown" id="selection-controls" style="display:none">
+                <button class="btn btn-secondary btn-sm" type="button" id="copy-links-btn" data-toggle="dropdown" aria-haspopup="true" aria-expanded="false">
+                    <span id="selection-count">0</span> items selected...
+                </button>
+                <div class="dropdown-menu dropdown-menu-right">
+                    <a class="dropdown-item" href="#" id="copy-links-action">Copy links</a>
                 </div>
-            }
+            </div>
         </div>
         <div class="col">
             @if (_milestones is not null)
             {
                 <div class="mr-2 float-right">
                     <div class="dropdown">
-                        <button class="btn btn-sm dropdown-toggle" type="button" id="dropdownMenuButton" data-toggle="dropdown" aria-haspopup="true" aria-expanded="false">
+                        <button class="btn btn-sm dropdown-toggle" type="button" id="milestone-dropdown-btn" data-toggle="dropdown" aria-haspopup="true" aria-expanded="false">
                             Milestones
                         </button>
-                        <div class="dropdown-menu dropdown-menu-right" aria-labelledby="dropdownMenuButton">
+                        <form method="get" action="@CurrentPath" class="dropdown-menu dropdown-menu-right p-2" id="milestone-form" aria-labelledby="milestone-dropdown-btn">
+                            <input type="hidden" name="milestones_open" value="1" />
+                            @if (SelectedGroup != RepositoryGroupService.Default)
+                            {
+                                <input type="hidden" name="g" value="@SelectedGroup.Name" />
+                            }
+                            @if (!string.IsNullOrEmpty(Filter))
+                            {
+                                <input type="hidden" name="q" value="@Filter" />
+                            }
 
-                            <button class="dropdown-item" @onclick="_ => ToggleAllMilestones(true)">Select All</button>
-                            <button class="dropdown-item" @onclick="_ => ToggleAllMilestones(false)">Select None</button>
+                            <button type="button" class="dropdown-item" id="select-all-milestones">Select All</button>
+                            <button type="button" class="dropdown-item" id="select-none-milestones">Select None</button>
                             <div class="dropdown-divider"></div>
 
                             @foreach ((string k, bool v) in _milestones)
                             {
                                 <div class="m-2 checkbox">
-                                    <label><input class="mr-2 " type="checkbox" checked="@v" @onchange="_ => MilestoneChecked(k)">@k</label>
+                                    <label><input class="mr-2" type="checkbox" name="m" value="@k" checked="@(v ? "checked" : null)" onchange="window.submitMilestoneForm()">@k</label>
                                 </div>
                             }
-                        </div>
+                        </form>
                     </div>
                 </div>
             }
@@ -95,11 +105,28 @@
             continue;
 
         string background = issue.IsBlocking ? "gh-issue-blocking" : "";
+        string reviewerLinks = string.Join(" ", issue.Reviewers.Select(r => $"[{r.Name}](https://github.com/{r.GitHubUserName})"));
 
-        <div class="gh-issue-cell @background text-break">
+        string issueMarkdown = $"* [{issue.IdFull}]({issue.Url}): {issue.Title}\n";
+        if (issue.Reviewers.Any())
+        {
+            string reviewerMentions = string.Join(" ", issue.Reviewers.Select(r => {
+                string guid = Guid.NewGuid().ToString("N").ToUpper();
+                return $"<a id=\"OWAAM{guid}Z\" href=\"{r.Email}\">@{r.Name}</a>";
+            }));
+            issueMarkdown += $"    - {reviewerMentions}\n";
+        }
+        string issueHtml = Markdig.Markdown.ToHtml(issueMarkdown);
+
+        <div class="gh-issue-cell @background text-break"
+             data-issue-url="@issue.Url"
+             data-issue-id="@issue.IdFull"
+             data-issue-title="@issue.Title"
+             data-issue-reviewers="@reviewerLinks"
+             data-issue-html="@issueHtml">
             <div class="d-flex flex-row align-items-center">
                 <div class="align-self-center">
-                    <input class="ml-2 mr-3" type="checkbox" checked="@_checkedIssues.Contains(issue)" @onchange="e => CheckIssue(issue, (bool)e.Value!)" />
+                    <input class="ml-2 mr-3 issue-checkbox" type="checkbox" />
                 </div>
                 <div>
                     <a class="gh-issue-title" href="@issue.Url">@issue.Title.HighlightCode()</a>
@@ -135,7 +162,149 @@
 <AuthorizeView Roles="@ApiReviewConstants.ApiApproverRole">
     <div class="form-group row">
         <div class="col-sm-10">
-            <button class="btn btn-secondary" disabled="@(!CanRefresh)" @onclick="RefreshAsync">Force Refresh</button>
+            <form method="post" action="/admin/force-refresh">
+                <AntiforgeryToken />
+                <button class="btn btn-secondary" type="submit">Force Refresh</button>
+            </form>
         </div>
     </div>
 </AuthorizeView>
+
+<script>
+    // Global: called from checkbox onchange attributes
+    window.submitMilestoneForm = function () {
+        var form = document.getElementById('milestone-form');
+        if (!form) return;
+        var allBoxes = form.querySelectorAll('input[name="m"]');
+        var checkedBoxes = form.querySelectorAll('input[name="m"]:checked');
+        var mNone = form.querySelector('input[name="m_none"]');
+        if (checkedBoxes.length === allBoxes.length) {
+            // All checked — navigate to clean URL (no m params = server default = all milestones)
+            var params = new URLSearchParams();
+            var gInput = form.querySelector('input[name="g"]');
+            var qInput = form.querySelector('input[name="q"]');
+            if (gInput) params.set('g', gInput.value);
+            if (qInput) params.set('q', qInput.value);
+            params.set('milestones_open', '1');
+            window.location.href = form.action + '?' + params.toString();
+            return;
+        }
+        if (checkedBoxes.length === 0) {
+            if (!mNone) {
+                mNone = document.createElement('input');
+                mNone.type = 'hidden';
+                mNone.name = 'm_none';
+                mNone.value = '1';
+                form.appendChild(mNone);
+            }
+        } else {
+            if (mNone) mNone.remove();
+        }
+        form.submit();
+    };
+
+    (function () {
+        var selectAll = document.getElementById('select-all-issues');
+        var countDisplay = document.getElementById('issue-count-display');
+        var selectionControls = document.getElementById('selection-controls');
+        var selectionCount = document.getElementById('selection-count');
+        var copyAction = document.getElementById('copy-links-action');
+
+        function getChecked() {
+            return document.querySelectorAll('.issue-checkbox:checked');
+        }
+
+        function updateSelectionUI() {
+            var checked = getChecked();
+            var total = document.querySelectorAll('.issue-checkbox');
+            var n = checked.length;
+            if (n === 0) {
+                countDisplay.style.display = '';
+                selectionControls.style.display = 'none';
+                selectAll.checked = false;
+                selectAll.indeterminate = false;
+            } else {
+                countDisplay.style.display = 'none';
+                selectionControls.style.display = '';
+                selectionCount.textContent = n;
+                selectAll.checked = n === total.length;
+                selectAll.indeterminate = n > 0 && n < total.length;
+            }
+        }
+
+        document.addEventListener('change', function (e) {
+            if (e.target === selectAll) {
+                document.querySelectorAll('.issue-checkbox').forEach(function (cb) {
+                    cb.checked = selectAll.checked;
+                });
+                updateSelectionUI();
+            } else if (e.target.classList.contains('issue-checkbox')) {
+                updateSelectionUI();
+            }
+        });
+
+        // Re-open milestone dropdown if the form was just submitted
+        var params = new URLSearchParams(window.location.search);
+        if (params.get('milestones_open') === '1') {
+            params.delete('milestones_open');
+            var newUrl = window.location.pathname + (params.toString() ? '?' + params.toString() : '');
+            history.replaceState(null, '', newUrl);
+            // Use DOMContentLoaded so jQuery + Bootstrap JS are loaded before calling dropdown('show')
+            document.addEventListener('DOMContentLoaded', function () {
+                var btn = document.getElementById('milestone-dropdown-btn');
+                if (btn) {
+                    $(btn).dropdown('show');
+                }
+            });
+        }
+
+        // Select All / Select None milestone buttons
+        var milestoneForm = document.getElementById('milestone-form');
+        var selectAllMilestones = document.getElementById('select-all-milestones');
+        var selectNoneMilestones = document.getElementById('select-none-milestones');
+        if (selectAllMilestones && milestoneForm) {
+            selectAllMilestones.addEventListener('click', function () {
+                milestoneForm.querySelectorAll('input[name="m"]').forEach(function (cb) { cb.checked = true; });
+                window.submitMilestoneForm();
+            });
+        }
+        if (selectNoneMilestones && milestoneForm) {
+            selectNoneMilestones.addEventListener('click', function () {
+                milestoneForm.querySelectorAll('input[name="m"]').forEach(function (cb) { cb.checked = false; });
+                window.submitMilestoneForm();
+            });
+        }
+
+        if (copyAction) {
+            copyAction.addEventListener('click', function (e) {
+                e.preventDefault();
+                var textLines = [];
+                var htmlItems = [];
+                getChecked().forEach(function (cb) {
+                    var cell = cb.closest('[data-issue-url]');
+                    if (cell) {
+                        var id = cell.getAttribute('data-issue-id');
+                        var url = cell.getAttribute('data-issue-url');
+                        var title = cell.getAttribute('data-issue-title');
+                        var reviewers = cell.getAttribute('data-issue-reviewers');
+                        var issueHtml = cell.getAttribute('data-issue-html');
+                        textLines.push('* [' + id + '](' + url + '): ' + title);
+                        if (reviewers) textLines.push('    - ' + reviewers);
+                        if (issueHtml) {
+                            var li = new DOMParser().parseFromString(issueHtml, 'text/html').querySelector('li');
+                            if (li) htmlItems.push(li.outerHTML);
+                        }
+                    }
+                });
+                var text = textLines.join('\n');
+                var html = '<ul>' + htmlItems.join('') + '</ul>';
+                navigator.clipboard.write([new ClipboardItem({
+                    'text/plain': new Blob([text], { type: 'text/plain' }),
+                    'text/html': new Blob([html], { type: 'text/html' })
+                })]);
+                document.querySelectorAll('.issue-checkbox').forEach(function (cb) { cb.checked = false; });
+                updateSelectionUI();
+            });
+        }
+    })();
+</script>
