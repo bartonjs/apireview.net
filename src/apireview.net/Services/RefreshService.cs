@@ -30,7 +30,7 @@ public sealed class RefreshService : BackgroundService
 
     public override async Task StartAsync(CancellationToken cancellationToken)
     {
-        await ReloadAsync();
+        _ = ReloadAsync();
         await base.StartAsync(cancellationToken);
     }
 
@@ -55,10 +55,15 @@ public sealed class RefreshService : BackgroundService
     {
         try
         {
-            //await _ospoService.ReloadAsync();
-            await _teamService.ReloadAsync();
-            await _areaOwnerService.ReloadAsync();
-            await _issueService.ReloadAsync();
+            Task[] tasks =
+            {
+                //_ospoService.ReloadAsync(),
+                _teamService.ReloadAsync(),
+                _areaOwnerService.ReloadAsync(),
+                _issueService.ReloadAsync(),
+            };
+
+            await Task.WhenAll(tasks);
         }
         catch (Exception ex)
         {
