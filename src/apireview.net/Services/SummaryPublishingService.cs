@@ -62,7 +62,7 @@ public sealed class SummaryPublishingService
             await UpdateCommentsAsync(summary);
         }
 
-        string url = await CommitAsync(group, summary);
+        string url = await CommitOrCreatePullRequestAsync(group, summary);
         await SendEmailAsync(group, summary);
         return ApiReviewPublicationResult.Suceess(url);
     }
@@ -163,7 +163,7 @@ public sealed class SummaryPublishingService
         }
     }
 
-    private async Task<string> CommitAsync(RepositoryGroup group, ApiReviewSummary summary)
+    private async Task<string> CommitOrCreatePullRequestAsync(RepositoryGroup group, ApiReviewSummary summary)
     {
         (string owner, string repo) = group.NotesRepo;
         string branch = ApiReviewConstants.ApiReviewsBranch;
@@ -199,12 +199,58 @@ public sealed class SummaryPublishingService
             NewCommit newCommit = new NewCommit(commitMessage, newTreeResponse.Sha, latestCommit.Sha);
             Commit? newCommitResponse = await github.Git.Commit.Create(owner, repo, newCommit);
 
-            ReferenceUpdate newReference = new ReferenceUpdate(newCommitResponse.Sha);
-            await github.Git.Reference.Update(owner, repo, head, newReference);
+            try
+            {
+                ReferenceUpdate newReference = new ReferenceUpdate(newCommitResponse.Sha);
+                await github.Git.Reference.Update(owner, repo, head, newReference);
+            }
+            catch (Exception ex)
+            {
+                _logger.LogWarning(ex, "Direct commit to {Owner}/{Repo} on {Branch} failed; creating pull request instead.", owner, repo, branch);
+                return await CreatePullRequestAsync(
+                    github,
+                    owner,
+                    repo,
+                    branch,
+                    group,
+                    date,
+                    commitMessage,
+                    latestCommit.Sha,
+                    newCommitResponse.Sha);
+            }
         }
 
         string url = $"https://github.com/{owner}/{repo}/blob/{branch}/{path}";
         return url;
+    }
+
+    private static async Task<string> CreatePullRequestAsync(
+        GitHubClient github,
+        string owner,
+        string repo,
+        string targetBranch,
+        RepositoryGroup group,
+        DateTime date,
+        string commitMessage,
+        string baseCommitSha,
+        string newCommitSha)
+    {
+        string prBranch = $"apireview/{date:yyyy-MM-dd}-{group.NotesSuffix}-{newCommitSha[..7]}";
+        string prHead = $"refs/heads/{prBranch}";
+        string prBody = $"This PR was created automatically because updating `{targetBranch}` directly failed.\n\nIt adds the generated API review notes for {date:d}.";
+
+        await github.Git.Reference.Create(owner, repo, new NewReference(prHead, baseCommitSha));
+
+        ReferenceUpdate prReferenceUpdate = new ReferenceUpdate(newCommitSha);
+        await github.Git.Reference.Update(owner, repo, prHead, prReferenceUpdate);
+
+        NewPullRequest pullRequest = new NewPullRequest(commitMessage, prBranch, targetBranch)
+        {
+            Body = prBody
+        };
+
+        PullRequest pr = await github.PullRequest.Create(owner, repo, pullRequest);
+        return pr.HtmlUrl;
     }
 
     private static string GetMarkdown(ApiReviewSummary summary)
