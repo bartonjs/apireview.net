@@ -178,11 +178,11 @@ public sealed class SummaryPublishingService
         string commitMessage = $"Add review notes for {date:d}";
 
         GitHubClient github = await _clientFactory.CreateForAppAsync();
-        (Commit? latestCommit, TreeItem? file) = await GetFile(github, owner, repo, branch, path);
+        (Commit? latestCommit, TreeItem? file) = await GetFile(github, owner, repo, head, path);
 
         if (file is null)
         {
-            (_, file) = await GetFile(github, owner, repo, fallbackBranch, path);
+            (_, file) = await GetFile(github, owner, repo, fallbackHead, path);
 
             if (file is not null)
             {
