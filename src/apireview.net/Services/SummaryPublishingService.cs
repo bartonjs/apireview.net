@@ -169,9 +169,9 @@ public sealed class SummaryPublishingService
         (string owner, string repo) = group.NotesRepo;
         
         string branch = ApiReviewConstants.ApiReviewsBranch;
-        string head = $"refs/{branch}";
+        string head = $"heads/{branch}";
         string fallbackBranch = $"apireview/{date:yyyy-MM-dd}-{group.NotesSuffix}";
-        string fallbackHead = $"refs/{branch}";
+        string fallbackHead = $"heads/{branch}";
         string path = $"{date.Year}/{date.Month:00}-{date.Day:00}-{group.NotesSuffix}/README.md";
         
         string markdown = $"# API Review {date:d}\n\n{GetMarkdown(summary)}";
