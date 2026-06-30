@@ -171,7 +171,7 @@ public sealed class SummaryPublishingService
         string branch = ApiReviewConstants.ApiReviewsBranch;
         string head = $"heads/{branch}";
         string fallbackBranch = $"apireview/{date:yyyy-MM-dd}-{group.NotesSuffix}";
-        string fallbackHead = $"heads/{branch}";
+        string fallbackHead = $"heads/{fallbackBranch}";
         string path = $"{date.Year}/{date.Month:00}-{date.Day:00}-{group.NotesSuffix}/README.md";
         
         string markdown = $"# API Review {date:d}\n\n{GetMarkdown(summary)}";
@@ -218,7 +218,7 @@ public sealed class SummaryPublishingService
             {
                 _logger.LogWarning(ex, "Direct commit to {Owner}/{Repo} on {Branch} failed; trying fallback branch.", owner, repo, branch);
 
-                string? branchLatestCommit = await EnsureBranch(github, owner, repo, fallbackBranch, latestCommit.Sha);
+                string? branchLatestCommit = await EnsureBranch(github, owner, repo, fallbackHead, latestCommit.Sha);
 
                 // If the branch already exists and is on a different latest commit
                 if (branchLatestCommit is not null)
