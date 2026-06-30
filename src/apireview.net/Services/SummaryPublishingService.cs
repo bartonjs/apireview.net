@@ -165,20 +165,30 @@ public sealed class SummaryPublishingService
 
     private async Task<string> CommitOrCreatePullRequestAsync(RepositoryGroup group, ApiReviewSummary summary)
     {
-        (string owner, string repo) = group.NotesRepo;
-        string branch = ApiReviewConstants.ApiReviewsBranch;
-        string head = $"heads/{branch}";
         DateTime date = summary.Items.First().FeedbackDateTime.DateTime;
-        string markdown = $"# API Review {date:d}\n\n{GetMarkdown(summary)}";
+        (string owner, string repo) = group.NotesRepo;
+        
+        string branch = ApiReviewConstants.ApiReviewsBranch;
+        string head = $"refs/{branch}";
+        string fallbackBranch = $"apireview/{date:yyyy-MM-dd}-{group.NotesSuffix}";
+        string fallbackHead = $"refs/{branch}";
         string path = $"{date.Year}/{date.Month:00}-{date.Day:00}-{group.NotesSuffix}/README.md";
+        
+        string markdown = $"# API Review {date:d}\n\n{GetMarkdown(summary)}";
         string commitMessage = $"Add review notes for {date:d}";
 
         GitHubClient github = await _clientFactory.CreateForAppAsync();
-        Reference? masterReference = await github.Git.Reference.Get(owner, repo, head);
-        Commit? latestCommit = await github.Git.Commit.Get(owner, repo, masterReference.Object.Sha);
+        (Commit? latestCommit, TreeItem? file) = await GetFile(github, owner, repo, branch, path);
 
-        TreeResponse? recursiveTreeResponse = await github.Git.Tree.GetRecursive(owner, repo, latestCommit.Tree.Sha);
-        TreeItem? file = recursiveTreeResponse.Tree.SingleOrDefault(t => t.Path == path);
+        if (file is null)
+        {
+            (_, file) = await GetFile(github, owner, repo, fallbackBranch, path);
+
+            if (file is not null)
+            {
+                branch = fallbackBranch;
+            }
+        }
 
         if (file is null)
         {
@@ -191,7 +201,7 @@ public sealed class SummaryPublishingService
 
             NewTree newTree = new NewTree
             {
-                BaseTree = latestCommit.Tree.Sha
+                BaseTree = latestCommit!.Tree.Sha
             };
             newTree.Tree.Add(newTreeItem);
 
@@ -206,51 +216,78 @@ public sealed class SummaryPublishingService
             }
             catch (Exception ex)
             {
-                _logger.LogWarning(ex, "Direct commit to {Owner}/{Repo} on {Branch} failed; creating pull request instead.", owner, repo, branch);
-                return await CreatePullRequestAsync(
-                    github,
-                    owner,
-                    repo,
-                    branch,
-                    group,
-                    date,
-                    commitMessage,
-                    latestCommit.Sha,
-                    newCommitResponse.Sha);
+                _logger.LogWarning(ex, "Direct commit to {Owner}/{Repo} on {Branch} failed; trying fallback branch.", owner, repo, branch);
+
+                string? branchLatestCommit = await EnsureBranch(github, owner, repo, fallbackBranch, latestCommit.Sha);
+
+                // If the branch already exists and is on a different latest commit
+                if (branchLatestCommit is not null)
+                {
+                    newCommit = new NewCommit(commitMessage, newTreeResponse.Sha, branchLatestCommit);
+                    newCommitResponse = await github.Git.Commit.Create(owner, repo, newCommit);
+                }
+
+                ReferenceUpdate newReference = new ReferenceUpdate(newCommitResponse.Sha);
+                await github.Git.Reference.Update(owner, repo, fallbackHead, newReference);
+
+                branch = fallbackBranch;
             }
         }
 
         string url = $"https://github.com/{owner}/{repo}/blob/{branch}/{path}";
         return url;
-    }
 
-    private static async Task<string> CreatePullRequestAsync(
-        GitHubClient github,
-        string owner,
-        string repo,
-        string targetBranch,
-        RepositoryGroup group,
-        DateTime date,
-        string commitMessage,
-        string baseCommitSha,
-        string newCommitSha)
-    {
-        string prBranch = $"apireview/{date:yyyy-MM-dd}-{group.NotesSuffix}-{newCommitSha[..7]}";
-        string prHead = $"refs/heads/{prBranch}";
-        string prBody = $"This PR was created automatically because updating `{targetBranch}` directly failed.\n\nIt adds the generated API review notes for {date:d}.";
-
-        await github.Git.Reference.Create(owner, repo, new NewReference(prHead, baseCommitSha));
-
-        ReferenceUpdate prReferenceUpdate = new ReferenceUpdate(newCommitSha);
-        await github.Git.Reference.Update(owner, repo, prHead, prReferenceUpdate);
-
-        NewPullRequest pullRequest = new NewPullRequest(commitMessage, prBranch, targetBranch)
+        static async Task<(Commit? LatestCommit, TreeItem? TreeItem)> GetFile(
+            GitHubClient github,
+            string owner,
+            string repo,
+            string head,
+            string path)
         {
-            Body = prBody
-        };
+            Reference? branchReference = null;
 
-        PullRequest pr = await github.PullRequest.Create(owner, repo, pullRequest);
-        return pr.HtmlUrl;
+            try
+            {
+                branchReference = await github.Git.Reference.Get(owner, repo, head);
+            }
+            catch (Exception)
+            {
+            }
+
+            if (branchReference is null)
+            {
+                return (null, null);
+            }
+
+            Commit? latestCommit = await github.Git.Commit.Get(owner, repo, branchReference.Object.Sha);
+            TreeResponse? recursiveTreeResponse = await github.Git.Tree.GetRecursive(owner, repo, latestCommit.Tree.Sha);
+            TreeItem? file = recursiveTreeResponse.Tree.SingleOrDefault(t => t.Path == path);
+            return (latestCommit, file);
+        }
+
+        static async Task<string?> EnsureBranch(
+            GitHubClient github,
+            string owner,
+            string repo,
+            string fallbackHead,
+            string baseCommitId)
+        {
+            try
+            {
+                await github.Git.Reference.Create(owner, repo, new NewReference(fallbackHead, baseCommitId));
+            }
+            catch (Exception)
+            {
+                Reference? branchReference = await github.Git.Reference.Get(owner, repo, fallbackHead);
+
+                if (!string.Equals(baseCommitId, branchReference.Object.Sha, StringComparison.OrdinalIgnoreCase))
+                {
+                    return branchReference.Object.Sha;
+                }
+            }
+
+            return null;
+        }
     }
 
     private static string GetMarkdown(ApiReviewSummary summary)
