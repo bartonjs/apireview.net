@@ -138,7 +138,8 @@ public sealed class ApiReviewIssue : IComparable<ApiReviewIssue>
         // The desired sort order is:
         //
         // 1. Milestones that look like versions, sorted by version number
-        // 2. Milestones that aren't versions, sorted by text (e.g. "Backlog", "Future")
+        // 2. Milestones that aren't versions (e.g. "Backlog", "Future"), all considered
+        //    equal to each other -- we deliberately don't rank them by name
         // 3. No milestone
         //
         // Why does no milestone go last? Because we don't to punish folks for triaging milestones.
@@ -177,6 +178,6 @@ public sealed class ApiReviewIssue : IComparable<ApiReviewIssue>
         if (xIsVersion && yIsVersion)
             return xVersion!.CompareTo(yVersion);
 
-        return string.Compare(x, y, StringComparison.OrdinalIgnoreCase);
+        return 0;
     }
 }
