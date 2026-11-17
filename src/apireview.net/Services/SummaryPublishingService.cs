@@ -62,9 +62,9 @@ public sealed class SummaryPublishingService
             await UpdateCommentsAsync(summary);
         }
 
-        string url = await CommitOrCreatePullRequestAsync(group, summary);
+        (string url, string? pullRequestUrl) = await CommitOrCreatePullRequestAsync(group, summary);
         await SendEmailAsync(group, summary);
-        return ApiReviewPublicationResult.Suceess(url);
+        return ApiReviewPublicationResult.Suceess(url, pullRequestUrl);
     }
 
     private async Task SendEmailAsync(RepositoryGroup group, ApiReviewSummary summary)
@@ -163,7 +163,7 @@ public sealed class SummaryPublishingService
         }
     }
 
-    private async Task<string> CommitOrCreatePullRequestAsync(RepositoryGroup group, ApiReviewSummary summary)
+    private async Task<(string Url, string? PullRequestUrl)> CommitOrCreatePullRequestAsync(RepositoryGroup group, ApiReviewSummary summary)
     {
         DateTime date = summary.Items.First().FeedbackDateTime.DateTime;
         (string owner, string repo) = group.NotesRepo;
@@ -235,7 +235,10 @@ public sealed class SummaryPublishingService
         }
 
         string url = $"https://github.com/{owner}/{repo}/blob/{branch}/{path}";
-        return url;
+        string? pullRequestUrl = branch == ApiReviewConstants.ApiReviewsBranch
+            ? null
+            : $"https://github.com/{owner}/{repo}/compare/{ApiReviewConstants.ApiReviewsBranch}...{branch}?expand=1";
+        return (url, pullRequestUrl);
 
         static async Task<(Commit? LatestCommit, TreeItem? TreeItem)> GetFile(
             GitHubClient github,
