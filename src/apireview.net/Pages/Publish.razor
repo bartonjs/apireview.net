@@ -132,7 +132,13 @@ else if (Summary is not null && Summary.Items.Any())
     {
         if (PublicationResult.Success)
         {
-            <div class="mt-3 mb-4 alert alert-success">Notes published <a href="@PublicationResult.Url">here</a>.</div>
+            <div class="mt-3 mb-4 alert alert-success">
+                Notes published <a href="@PublicationResult.Url">here</a>.
+                @if (PublicationResult.PullRequestUrl is not null)
+                {
+                    <a href="@PublicationResult.PullRequestUrl">Open a PR</a>
+                }
+            </div>
         }
         else
         {
